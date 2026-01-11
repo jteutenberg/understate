@@ -1,27 +1,28 @@
 package state
 
 import (
+	"github.com/jteutenberg/bitset-go"
 	"github.com/jteutenberg/understate/core"
 )
 
 type State struct {
-	Answerer
+	core.Answerer
 	// facts by Functor name
-	TrueFacts  map[string][]*Predicate
-	FalseFacts map[string][]*Predicate
+	TrueFacts  map[string][]*core.Predicate
+	FalseFacts map[string][]*core.Predicate
 }
 
-func (s *State) Answer(p *Predicate) (<-chan []*Atomic, []*AtomicSet) {
+func (s *State) Answer(p *core.Predicate) (<-chan []*core.Atomic, []*bitset.IntSet) {
 	trueFacts := s.TrueFacts[p.Definition.Functor]
 	falseFacts := s.FalseFacts[p.Definition.Functor]
-	answer := make(chan []*Atomic)
+	answer := make(chan []*core.Atomic)
 	go func() {
 		// if this is a ground predicate and is in falseFacts, then
 		// send a Terminate token and close the channel
 		if p.IsFact() {
 			for _, fact := range falseFacts {
 				if fact.CanUnify(p) {
-					answer <- []*Atomic{&Terminate}
+					answer <- []*core.Atomic{&core.Terminate}
 					close(answer)
 					return
 				}
@@ -30,18 +31,18 @@ func (s *State) Answer(p *Predicate) (<-chan []*Atomic, []*AtomicSet) {
 		for _, fact := range trueFacts {
 			if p.CanUnify(fact) {
 				// then return this fact's values
-				values := make([]*Atomic, len(p.VarRefs))
+				values := make([]*core.Atomic, len(p.VarRefs))
 				for i, varRef := range fact.VarRefs {
-					values[i] = varRef.Dereference().Ref.(*Atomic)
+					values[i] = varRef.Dereference().Ref.(*core.Atomic)
 				}
 				answer <- values
 			}
 		}
 		close(answer)
 	}()
-	maxSets := make([]*AtomicSet, len(p.VarRefs))
+	maxSets := make([]*bitset.IntSet, len(p.VarRefs))
 	for i, varDef := range p.Definition.ArgDefinitions {
-		maxSets[i] = &varDef.Type.Atomics
+		maxSets[i] = varDef.Type.Atomics
 	}
 	return answer, maxSets
 }

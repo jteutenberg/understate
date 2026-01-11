@@ -1,21 +1,21 @@
 package core
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/jteutenberg/bitset-go"
+)
 
 func TestSimpleUnify(t *testing.T) {
 	cow := Atomic{Index: 1, Value: "cow"}
 	grass := Atomic{Index: 2, Value: "grass"}
 	plantType := Type{
-		Name: "Plant",
-		Atomics: AtomicSet{
-			grass: true,
-		},
+		Name:    "Plant",
+		Atomics: bitset.NewIntSetFromInts([]int{grass.Index}),
 	}
 	herbivoreType := Type{
-		Name: "Herbivore",
-		Atomics: AtomicSet{
-			cow: true,
-		},
+		Name:    "Herbivore",
+		Atomics: bitset.NewIntSetFromInts([]int{cow.Index}),
 	}
 	def := &PredicateDefinition{
 		Functor: "eat",

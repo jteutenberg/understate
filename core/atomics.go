@@ -1,6 +1,10 @@
 package core
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/jteutenberg/bitset-go"
+)
 
 type Atomic struct {
 	Index int
@@ -11,11 +15,9 @@ type Atomic struct {
 // the marker for Termination
 var Terminate = Atomic{Index: -1, Value: "Terminate"}
 
-type AtomicSet map[Atomic]bool
-
 type Type struct {
 	Name    string
-	Atomics AtomicSet
+	Atomics *bitset.IntSet
 }
 
 func (a *Atomic) String() string {

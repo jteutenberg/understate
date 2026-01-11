@@ -1,6 +1,10 @@
-package core 
+package core
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/jteutenberg/bitset-go"
+)
 
 type ArgumentDefinition struct {
 	Label         string
@@ -31,7 +35,7 @@ type Predicate struct {
 }
 
 type Answerer interface {
-	Answer(p *Predicate) (<-chan []*Atomic, []*AtomicSet)
+	Answer(p *Predicate) (<-chan []*Atomic, []*bitset.IntSet)
 }
 
 func (p *Predicate) String() string {

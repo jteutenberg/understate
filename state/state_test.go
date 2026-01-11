@@ -1,63 +1,61 @@
 package state
 
 import (
-	"github.com/jteutenberg/understate/core"
 	"testing"
+
+	"github.com/jteutenberg/bitset-go"
+	"github.com/jteutenberg/understate/core"
 )
 
 func TestFactAnswer(t *testing.T) {
-	cow := Atomic{Index: 1, Value: "cow"}
-	grass := Atomic{Index: 2, Value: "grass"}
-	plantType := Type{
-		Name: "Plant",
-		Atomics: AtomicSet{
-			grass: true,
-		},
+	cow := core.Atomic{Index: 1, Value: "cow"}
+	grass := core.Atomic{Index: 2, Value: "grass"}
+	plantType := core.Type{
+		Name:    "Plant",
+		Atomics: bitset.NewIntSetFromInts([]int{grass.Index}),
 	}
-	herbivoreType := Type{
-		Name: "Herbivore",
-		Atomics: AtomicSet{
-			cow: true,
-		},
+	herbivoreType := core.Type{
+		Name:    "Herbivore",
+		Atomics: bitset.NewIntSetFromInts([]int{cow.Index}),
 	}
 	// true fact: cow eats grass
-	eatDef := &PredicateDefinition{
+	eatDef := &core.PredicateDefinition{
 		Functor: "eat",
-		ArgDefinitions: []ArgumentDefinition{
+		ArgDefinitions: []core.ArgumentDefinition{
 			{Label: "Eater", Type: &herbivoreType},
 			{Label: "Food", Type: &plantType},
 		},
 	}
-	trueFact := &Predicate{
+	trueFact := &core.Predicate{
 		Definition: eatDef,
 		VarLabels:  []string{"?1", "?2"},
-		VarRefs: []*VariableReference{
+		VarRefs: []*core.VariableReference{
 			{Label: "X", Ref: &cow},
 			{Label: "Y", Ref: &grass},
 		},
 	}
 	// false fact: cow does not eat cow
-	falseFact := &Predicate{
+	falseFact := &core.Predicate{
 		Definition: eatDef,
 		VarLabels:  []string{"?1", "?2"},
-		VarRefs: []*VariableReference{
+		VarRefs: []*core.VariableReference{
 			{Label: "X", Ref: &cow},
 			{Label: "Y", Ref: &cow},
 		},
 	}
 	state := &State{
-		TrueFacts: map[string][]*Predicate{
+		TrueFacts: map[string][]*core.Predicate{
 			"eat": {trueFact},
 		},
-		FalseFacts: map[string][]*Predicate{
+		FalseFacts: map[string][]*core.Predicate{
 			"eat": {falseFact},
 		},
 	}
 	//find what cows eat
-	query := &Predicate{
+	query := &core.Predicate{
 		Definition: eatDef,
 		VarLabels:  []string{"?1", "?2"},
-		VarRefs: []*VariableReference{
+		VarRefs: []*core.VariableReference{
 			{Label: "X", Ref: &cow},
 			{Label: "Y", Ref: nil},
 		},
