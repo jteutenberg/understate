@@ -19,7 +19,8 @@ func (s *State) Answer(p *core.Predicate) (<-chan []*core.Atomic, []*bitset.IntS
 	go func() {
 		// if this is a ground predicate and is in falseFacts, then
 		// send a Terminate token and close the channel
-		if p.IsFact() {
+		isFact := p.IsFact()
+		if isFact {
 			for _, fact := range falseFacts {
 				if fact.CanUnify(p) {
 					answer <- []*core.Atomic{&core.Terminate}
@@ -36,6 +37,9 @@ func (s *State) Answer(p *core.Predicate) (<-chan []*core.Atomic, []*bitset.IntS
 					values[i] = varRef.Dereference().Ref.(*core.Atomic)
 				}
 				answer <- values
+				if isFact {
+					break
+				}
 			}
 		}
 		close(answer)
