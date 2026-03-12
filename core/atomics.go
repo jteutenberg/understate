@@ -12,9 +12,6 @@ type Atomic struct {
 	Type  *Type
 }
 
-// the marker for Termination
-var Terminate = Atomic{Index: -1, Value: "Terminate"}
-
 type Type struct {
 	Name    string
 	Atomics *bitset.IntSet

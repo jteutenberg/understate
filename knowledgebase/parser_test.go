@@ -1,15 +1,15 @@
-package ui_test
+package knowledgebase_test
 
 import (
 	"testing"
 
 	"github.com/jteutenberg/understate/core"
-	"github.com/jteutenberg/understate/ui"
+	"github.com/jteutenberg/understate/knowledgebase"
 )
 
 func TestParseArguments(t *testing.T) {
-	parser := ui.NewParser()
-	args, err := parser.ParseArguments("X, Y, Z")
+	kb := knowledgebase.NewKnowledgeBase()
+	args, err := kb.ParseArguments("X, Y, Z", nil)
 	// three variables
 	if err != nil {
 		t.Errorf("error parsing arguments: %v", err)
@@ -23,8 +23,8 @@ func TestParseArguments(t *testing.T) {
 }
 
 func TestParseClauseAtomic(t *testing.T) {
-	parser := ui.NewParser()
-	atomic, next, err := parser.ParseClause("cow", nil)
+	kb := knowledgebase.NewKnowledgeBase()
+	atomic, next, err := kb.ParseClause("cow", nil)
 	if err != nil {
 		t.Errorf("error parsing atomic: %v", err)
 	}
@@ -37,8 +37,8 @@ func TestParseClauseAtomic(t *testing.T) {
 }
 
 func TestParseClauseAtomicWithTrailingChar(t *testing.T) {
-	parser := ui.NewParser()
-	atomic, next, err := parser.ParseClause("cow, dog", nil)
+	kb := knowledgebase.NewKnowledgeBase()
+	atomic, next, err := kb.ParseClause("cow, dog", nil)
 	if err != nil {
 		t.Errorf("error parsing atomic: %v", err)
 	}
@@ -51,8 +51,8 @@ func TestParseClauseAtomicWithTrailingChar(t *testing.T) {
 }
 
 func TestParseClauseVariable(t *testing.T) {
-	parser := ui.NewParser()
-	variable, next, err := parser.ParseClause("Xenon", nil)
+	kb := knowledgebase.NewKnowledgeBase()
+	variable, next, err := kb.ParseClause("Xenon", nil)
 	if err != nil {
 		t.Errorf("error parsing variable: %v", err)
 	}
@@ -65,15 +65,15 @@ func TestParseClauseVariable(t *testing.T) {
 }
 
 func TestParseClausePredicate(t *testing.T) {
-	parser := ui.NewParser()
-	parser.AddPredicateDefinition(&core.PredicateDefinition{
+	kb := knowledgebase.NewKnowledgeBase()
+	kb.AddPredicateDefinition(&core.PredicateDefinition{
 		Functor: "eat",
 		ArgDefinitions: []core.ArgumentDefinition{
 			{Label: "X", Type: nil},
 			{Label: "Y", Type: nil},
 		},
 	})
-	predicate, next, err := parser.ParseClause("eat(X, Y)", nil)
+	predicate, next, err := kb.ParseClause("eat(X, Y)", nil)
 	if err != nil {
 		t.Errorf("error parsing predicate: %v", err)
 	}

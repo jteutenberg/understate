@@ -37,7 +37,7 @@ func (s *State) Answer(p *core.Predicate) <-chan []*core.Atomic {
 		if isFact {
 			for _, fact := range falseFacts {
 				if fact.CanUnify(p) {
-					answer <- []*core.Atomic{&core.Terminate}
+					answer <- nil
 					close(answer)
 					return
 				}
