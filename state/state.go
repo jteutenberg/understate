@@ -1,9 +1,17 @@
 package state
 
 import (
+	"strconv"
+
 	"github.com/jteutenberg/bitset-go"
 	"github.com/jteutenberg/understate/core"
 )
+
+// positive integers
+var Numeric = &core.Type{
+	Name:    "Numeric",
+	Atomics: bitset.NewIntSet(),
+}
 
 type State struct {
 	core.Answerer
@@ -14,15 +22,18 @@ type State struct {
 	AllAtomics    *bitset.IntSet
 	atomicsByName map[string]*core.Atomic
 	Types         map[string]*core.Type
+
+	numericAtomics []*core.Atomic
 }
 
 func NewState() *State {
 	return &State{
-		TrueFacts:     make(map[string][]*core.Predicate),
-		FalseFacts:    make(map[string][]*core.Predicate),
-		AllAtomics:    bitset.NewIntSet(),
-		atomicsByName: make(map[string]*core.Atomic),
-		Types:         make(map[string]*core.Type),
+		TrueFacts:      make(map[string][]*core.Predicate),
+		FalseFacts:     make(map[string][]*core.Predicate),
+		AllAtomics:     bitset.NewIntSet(),
+		atomicsByName:  make(map[string]*core.Atomic),
+		Types:          make(map[string]*core.Type),
+		numericAtomics: make([]*core.Atomic, 1000000),
 	}
 }
 
@@ -65,6 +76,31 @@ func (s *State) GetAtomic(name string, t *core.Type) *core.Atomic {
 	if a := s.atomicsByName[name]; a != nil {
 		return a
 	}
+	if t == Numeric {
+		// value from name
+		atomicIndex, err := strconv.Atoi(name)
+		if err != nil || atomicIndex < 0 {
+			return nil
+		}
+		if atomicIndex >= len(s.numericAtomics) || s.numericAtomics[atomicIndex] == nil {
+			// create a new numeric atomic
+			atomic := &core.Atomic{
+				Index: atomicIndex,
+				Value: name,
+				Type:  Numeric,
+			}
+			if atomicIndex >= 1000000 {
+				// no caching
+				return atomic
+			}
+			for len(s.numericAtomics) <= atomicIndex {
+				s.numericAtomics = append(s.numericAtomics, nil)
+			}
+			s.numericAtomics[atomicIndex] = atomic
+		}
+		return s.numericAtomics[atomicIndex]
+	}
+	//handle non-numeric atomics
 	atomicIndex := uint(0)
 	if t != nil {
 		var ok bool

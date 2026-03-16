@@ -1,8 +1,11 @@
 package knowledgebase_test
 
 import (
+	"bufio"
+	"os"
 	"testing"
 
+	"github.com/jteutenberg/bitset-go"
 	"github.com/jteutenberg/understate/core"
 	"github.com/jteutenberg/understate/knowledgebase"
 )
@@ -69,8 +72,8 @@ func TestParseClausePredicate(t *testing.T) {
 	kb.AddPredicateDefinition(&core.PredicateDefinition{
 		Functor: "eat",
 		ArgDefinitions: []core.ArgumentDefinition{
-			{Label: "X", Type: nil},
-			{Label: "Y", Type: nil},
+			{Label: "A", Type: nil},
+			{Label: "B", Type: nil},
 		},
 	})
 	predicate, next, err := kb.ParseClause("eat(X, Y)", nil)
@@ -84,9 +87,65 @@ func TestParseClausePredicate(t *testing.T) {
 		t.Errorf("expected predicate to be eat, got %v", predicate)
 	}
 	if predicate.(*core.Predicate).VarRefs[0].Label != "X" {
-		t.Errorf("expected variable X, got %v", predicate.(*core.Predicate).VarRefs[0])
+		t.Errorf("expected variable X, got %v", predicate.(*core.Predicate).VarRefs[0].Dereference())
 	}
 	if predicate.(*core.Predicate).VarRefs[1].Label != "Y" {
-		t.Errorf("expected variable Y, got %v", predicate.(*core.Predicate).VarRefs[1])
+		t.Errorf("expected variable Y, got %v", predicate.(*core.Predicate).VarRefs[1].Dereference())
 	}
+}
+
+func TestPreparedExamples(t *testing.T) {
+	kb := knowledgebase.NewKnowledgeBase()
+	person := &core.Type{
+		Name:    "Person",
+		Atomics: bitset.NewIntSet(),
+	}
+	//kb.AddAtomic("sam", person)
+	//kb.AddAtomic("alex", person)
+	kb.AddPredicateDefinition(&core.PredicateDefinition{
+		Functor: "parent",
+		ArgDefinitions: []core.ArgumentDefinition{
+			{Label: "Parent", Type: person},
+			{Label: "Child", Type: person},
+		},
+	})
+
+	file, err := os.Open("../tests/input1.txt")
+	if err != nil {
+		t.Fatalf("failed to open test input file: %v", err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	lineNum := 0
+	for scanner.Scan() {
+		line := scanner.Text()
+		if len(line) < 2 {
+			continue
+		}
+		lineNum++
+		parsed, _, err := kb.ParseClause(line, nil)
+		if err != nil {
+			t.Errorf("error parsing line %d (%q): %v", lineNum, line, err)
+			continue
+		}
+		if parsed == nil {
+			t.Errorf("line %d: parser returned nil for line: %q", lineNum, line)
+		}
+		if p, ok := parsed.(*core.Predicate); ok {
+			if p.IsFact() {
+				kb.SetTrue(p)
+			} else {
+				answers := kb.Answer(p)
+				for ans := range answers {
+					if ans == nil {
+						t.Logf("%s: Done.", p.String())
+						break
+					}
+					t.Logf("%s -> %v", p.String(), ans)
+				}
+			}
+		}
+	}
+
 }

@@ -1,0 +1,7 @@
+parent(sam,alex)
+parent(jo,alex)
+parent(sam,sal)
+parent(nina,jo)
+
+parent(X,alex)
+parent(sam,Y)

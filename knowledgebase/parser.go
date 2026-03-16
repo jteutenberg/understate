@@ -51,8 +51,22 @@ func (kb *KnowledgeBase) ParsePredicate(functor, arguments string) (*core.Predic
 	vrefs := make([]*core.VariableReference, len(args))
 	for i, argDef := range pdef.ArgDefinitions {
 		vrefs[i] = &core.VariableReference{
-			Label: argDef.Label,
+			Label: "",
 			Ref:   nil,
+		}
+		if atomic, ok := args[i].(*core.Atomic); ok {
+			if argDef.Type == nil {
+				argDef.Type = atomic.Type
+			}
+			vrefs[i].Label = argDef.Label
+			vrefs[i].Ref = atomic
+		} else if predicate, ok := args[i].(*core.Predicate); ok {
+			vrefs[i].Label = argDef.Label
+			vrefs[i].Ref = predicate
+		} else if variable, ok := args[i].(*core.VariableReference); ok {
+			vrefs[i] = variable
+		} else {
+			return nil, fmt.Errorf("expected atomic, predicate, or variable reference, got %T", args[i])
 		}
 	}
 	return &core.Predicate{

@@ -62,6 +62,10 @@ func (p *Predicate) IsFact() bool {
 	return true
 }
 
+func (p *Predicate) GetArgument(index int) Unifiable {
+	return p.VarRefs[index].Dereference().Ref
+}
+
 func (r *VariableReference) String() string {
 	if r.Ref == nil {
 		return r.Label

@@ -36,7 +36,7 @@ func (rm *RuleMachine) Answer(p *core.Predicate) <-chan []*core.Atomic {
 	go func() {
 		for _, rule := range rm.rules {
 			if rule.lhs.CanUnify(p) {
-				// need to globally unify with each RHS predicate
+				// clone predicates and do the actual unification
 				// get an answer for each RHS predicate and
 				// begin DFS
 			}
