@@ -3,11 +3,13 @@ package knowledgebase_test
 import (
 	"bufio"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/jteutenberg/bitset-go"
 	"github.com/jteutenberg/understate/core"
 	"github.com/jteutenberg/understate/knowledgebase"
+	"github.com/jteutenberg/understate/rules"
 )
 
 func TestParseArguments(t *testing.T) {
@@ -96,6 +98,8 @@ func TestParseClausePredicate(t *testing.T) {
 
 func TestPreparedExamples(t *testing.T) {
 	kb := knowledgebase.NewKnowledgeBase()
+	rules := rules.NewRuleMachine(kb, kb.State)
+	kb.AddAnswerer(rules)
 	person := &core.Type{
 		Name:    "Person",
 		Atomics: bitset.NewIntSet(),
@@ -109,8 +113,22 @@ func TestPreparedExamples(t *testing.T) {
 			{Label: "Child", Type: person},
 		},
 	})
+	kb.AddPredicateDefinition(&core.PredicateDefinition{
+		Functor: "sibling",
+		ArgDefinitions: []core.ArgumentDefinition{
+			{Label: "A", Type: person},
+			{Label: "B", Type: person},
+		},
+	})
+	kb.AddPredicateDefinition(&core.PredicateDefinition{
+		Functor: "grandparent",
+		ArgDefinitions: []core.ArgumentDefinition{
+			{Label: "Grandparent", Type: person},
+			{Label: "Grandchild", Type: person},
+		},
+	})
 
-	file, err := os.Open("../tests/input1.txt")
+	file, err := os.Open("../tests/input2.txt")
 	if err != nil {
 		t.Fatalf("failed to open test input file: %v", err)
 	}
@@ -123,26 +141,40 @@ func TestPreparedExamples(t *testing.T) {
 		if len(line) < 2 {
 			continue
 		}
-		lineNum++
-		parsed, _, err := kb.ParseClause(line, nil)
-		if err != nil {
-			t.Errorf("error parsing line %d (%q): %v", lineNum, line, err)
+		if line[0] == '#' {
 			continue
 		}
-		if parsed == nil {
-			t.Errorf("line %d: parser returned nil for line: %q", lineNum, line)
-		}
-		if p, ok := parsed.(*core.Predicate); ok {
-			if p.IsFact() {
-				kb.SetTrue(p)
-			} else {
-				answers := kb.Answer(p)
-				for ans := range answers {
-					if ans == nil {
-						t.Logf("%s: Done.", p.String())
-						break
+		lineNum++
+		// if line contains ':-', then parse it as a rule
+		if strings.Contains(line, ":-") {
+			rule, err := kb.ParseRule(line)
+			if err != nil {
+				t.Errorf("error parsing rule line %d (%q): %v", lineNum, line, err)
+				continue
+			}
+			rules.AddRule(rule)
+		} else {
+			parsed, _, err := kb.ParseClause(line, nil)
+			if err != nil {
+				t.Errorf("error parsing line %d (%q): %v", lineNum, line, err)
+				continue
+			}
+			if parsed == nil {
+				t.Errorf("line %d: parser returned nil for line: %q", lineNum, line)
+				continue
+			}
+			if p, ok := parsed.(*core.Predicate); ok {
+				if p.IsFact() {
+					kb.SetTrue(p)
+				} else {
+					answers := kb.Answer(p)
+					for ans := range answers {
+						if ans == nil {
+							t.Logf("%s: Done.", p.String())
+							break
+						}
+						t.Logf("%s -> %v", p.String(), ans)
 					}
-					t.Logf("%s -> %v", p.String(), ans)
 				}
 			}
 		}

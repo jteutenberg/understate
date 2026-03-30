@@ -1,0 +1,9 @@
+parent(sam, alex)
+parent(jo,alex)
+parent(sam, sal)
+parent(nina, jo)
+
+sibling(A, B) :- parent(X, A), parent(X, B).
+grandparent(A, B) :- parent(A, X), parent(X, B).
+
+sibling(alex, X)

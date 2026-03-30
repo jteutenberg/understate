@@ -8,7 +8,7 @@ import (
 type KnowledgeBase struct {
 	core.Answerer
 	predicateDefinitions map[string]*core.PredicateDefinition
-	state                *state.State
+	State                *state.State
 
 	answerers []core.Answerer
 }
@@ -16,11 +16,11 @@ type KnowledgeBase struct {
 func NewKnowledgeBase() *KnowledgeBase {
 	kb := &KnowledgeBase{
 		predicateDefinitions: make(map[string]*core.PredicateDefinition),
-		state:                state.NewState(),
+		State:                state.NewState(),
 		//TODO: each predicate definition should have its own ordering of answerers
 		answerers: make([]core.Answerer, 0, 10),
 	}
-	kb.answerers = append(kb.answerers, kb.state)
+	kb.answerers = append(kb.answerers, kb.State)
 	return kb
 }
 
@@ -29,11 +29,15 @@ func (kb *KnowledgeBase) AddPredicateDefinition(pdef *core.PredicateDefinition) 
 }
 
 func (kb *KnowledgeBase) AddAtomic(name string, t *core.Type) {
-	kb.state.GetAtomic(name, t)
+	kb.State.GetAtomic(name, t)
+}
+
+func (kb *KnowledgeBase) AddAnswerer(answerer core.Answerer) {
+	kb.answerers = append(kb.answerers, answerer)
 }
 
 func (kb *KnowledgeBase) SetTrue(p *core.Predicate) {
-	kb.state.SetTrue(p)
+	kb.State.SetTrue(p)
 }
 
 func (kb *KnowledgeBase) Answer(p *core.Predicate) <-chan []*core.Atomic {

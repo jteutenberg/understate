@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/jteutenberg/understate/core"
+	"github.com/jteutenberg/understate/rules"
 )
 
 func (kb *KnowledgeBase) ParseArguments(s string, typeHints []*core.Type) ([]core.Unifiable, error) {
@@ -117,15 +118,56 @@ func (kb *KnowledgeBase) ParseClause(s string, typeHint *core.Type) (core.Unifia
 			}
 			if s[0] >= 'a' && s[0] <= 'z' {
 				// atomic
-				return kb.state.GetAtomic(s[:i], typeHint), j, nil
+				return kb.State.GetAtomic(s[:i], typeHint), j, nil
 			} else {
 				// variable
 				return &core.VariableReference{
 					Label: s[:i],
 					Ref:   nil,
-				}, i + 1, nil
+				}, j, nil
 			}
 		}
 	}
 	return nil, 0, fmt.Errorf("invalid clause: %s", s)
+}
+
+func (kb *KnowledgeBase) ParseRule(s string) (*rules.Rule, error) {
+	// consume the lead string up to the first ':-'
+	for i := 0; i < len(s)-1; i++ {
+		if s[i] == ':' && s[i+1] == '-' {
+			// this is a rule. Parse its lhs and rhs
+			var lhs *core.Predicate
+			if lhsClause, _, err := kb.ParseClause(s[:i], nil); err != nil {
+				return nil, err
+			} else {
+				lhs = lhsClause.(*core.Predicate)
+			}
+			i += 2
+			for i < len(s) && s[i] == ' ' {
+				i++
+			}
+			if i >= len(s) {
+				return nil, fmt.Errorf("expected rule RHS, got %q", s[i:])
+			}
+			end := i + 1
+			for end < len(s) && s[end] != '.' {
+				end++
+			}
+			// then parse multiple comma delimited predicates
+			rhs := make([]*core.Predicate, 0, 5)
+			args, err := kb.ParseArguments(s[i:end], nil)
+			if err != nil {
+				return nil, err
+			}
+			for i, arg := range args {
+				if predicate, ok := arg.(*core.Predicate); ok {
+					rhs = append(rhs, predicate)
+				} else {
+					return nil, fmt.Errorf("Expected predicate in rule's number %d RHS, got %T", i, arg)
+				}
+			}
+			return rules.NewRule(lhs, rhs), nil
+		}
+	}
+	return nil, fmt.Errorf("invalid rule: %s", s)
 }
