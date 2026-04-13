@@ -72,7 +72,6 @@ func (kb *KnowledgeBase) ParsePredicate(functor, arguments string) (*core.Predic
 	}
 	return &core.Predicate{
 		Definition: pdef,
-		VarLabels:  make([]string, 0, 5),
 		VarRefs:    vrefs,
 	}, nil
 

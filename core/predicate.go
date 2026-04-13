@@ -28,7 +28,6 @@ type VariableReference struct {
 
 type Predicate struct {
 	Definition *PredicateDefinition
-	VarLabels  []string // names like X, A, B, etc.
 	VarRefs    []*VariableReference
 }
 
@@ -170,17 +169,26 @@ func (a *Predicate) CanUnify(other Unifiable) bool {
 	return true
 }
 
+func (a *Predicate) CloneWithVars(vars map[string]*VariableReference) *Predicate {
+	p := &Predicate{
+		Definition: a.Definition,
+		VarRefs:    make([]*VariableReference, len(a.VarRefs)),
+	}
+	for i, varRef := range a.VarRefs {
+		p.VarRefs[i] = vars[varRef.Label]
+	}
+	return p
+}
+
 func (a *Predicate) Clone() Unifiable {
 	p := &Predicate{
 		Definition: a.Definition,
-		VarLabels:  make([]string, len(a.VarLabels)),
 		VarRefs:    make([]*VariableReference, len(a.VarRefs)),
 	}
 	newVars := make(map[string]*VariableReference)
-	for i, varLabel := range a.VarLabels {
-		p.VarLabels[i] = varLabel
+	for i, varRef := range a.VarRefs {
 		newVars[a.VarRefs[i].Label] = &VariableReference{
-			Label: varLabel,
+			Label: varRef.Label,
 			Ref:   nil,
 		}
 	}

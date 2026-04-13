@@ -53,7 +53,6 @@ func setupTest() (map[string]*core.Type, map[string]*core.PredicateDefinition, m
 func basicState(defs map[string]*core.PredicateDefinition, atomics map[string]*core.Atomic) *State {
 	trueFact := &core.Predicate{
 		Definition: defs["eat"],
-		VarLabels:  []string{"?1", "?2"},
 		VarRefs: []*core.VariableReference{
 			{Label: "X", Ref: atomics["cow"]},
 			{Label: "Y", Ref: atomics["grass"]},
@@ -61,7 +60,6 @@ func basicState(defs map[string]*core.PredicateDefinition, atomics map[string]*c
 	}
 	trueFact2 := &core.Predicate{
 		Definition: defs["eat"],
-		VarLabels:  []string{"?1", "?2"},
 		VarRefs: []*core.VariableReference{
 			{Label: "X", Ref: atomics["dog"]},
 			{Label: "Y", Ref: atomics["beef"]},
@@ -69,7 +67,6 @@ func basicState(defs map[string]*core.PredicateDefinition, atomics map[string]*c
 	}
 	trueFact3 := &core.Predicate{
 		Definition: defs["eat"],
-		VarLabels:  []string{"?1", "?2"},
 		VarRefs: []*core.VariableReference{
 			{Label: "X", Ref: atomics["cow"]},
 			{Label: "Y", Ref: atomics["apple"]},
@@ -78,7 +75,6 @@ func basicState(defs map[string]*core.PredicateDefinition, atomics map[string]*c
 	// false fact: cow does not eat beef
 	falseFact := &core.Predicate{
 		Definition: defs["eat"],
-		VarLabels:  []string{"?1", "?2"},
 		VarRefs: []*core.VariableReference{
 			{Label: "X", Ref: atomics["cow"]},
 			{Label: "Y", Ref: atomics["beef"]},
@@ -102,7 +98,6 @@ func TestStateAnswerQuery(t *testing.T) {
 	//find what cows eat
 	query := &core.Predicate{
 		Definition: defs["eat"],
-		VarLabels:  []string{"?1", "?2"},
 		VarRefs: []*core.VariableReference{
 			{Label: "X", Ref: atomics["cow"]},
 			{Label: "Y", Ref: nil},
@@ -130,7 +125,6 @@ func TestStateAnswerQueryPermutations(t *testing.T) {
 	//find what cows eat
 	query := &core.Predicate{
 		Definition: defs["eat"],
-		VarLabels:  []string{"?1", "?2"},
 		VarRefs: []*core.VariableReference{
 			{Label: "X", Ref: nil},
 			{Label: "Y", Ref: nil},
@@ -158,7 +152,6 @@ func TestStateAnswerQueryFact(t *testing.T) {
 	//find what cows eat
 	query := &core.Predicate{
 		Definition: defs["eat"],
-		VarLabels:  []string{"?1", "?2"},
 		VarRefs: []*core.VariableReference{
 			{Label: "X", Ref: atomics["cow"]},
 			{Label: "Y", Ref: atomics["grass"]},

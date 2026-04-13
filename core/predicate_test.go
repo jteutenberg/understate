@@ -27,7 +27,6 @@ func TestSimpleUnify(t *testing.T) {
 
 	predA := &Predicate{
 		Definition: def,
-		VarLabels:  []string{"?1", "?2"},
 		VarRefs: []*VariableReference{
 			{Label: "X", Ref: &cow},
 			{Label: "Y", Ref: nil},
@@ -35,7 +34,6 @@ func TestSimpleUnify(t *testing.T) {
 	}
 	predB := &Predicate{
 		Definition: def,
-		VarLabels:  []string{"?3", "?4"},
 		VarRefs: []*VariableReference{
 			{Label: "A", Ref: nil},
 			{Label: "B", Ref: &grass},
