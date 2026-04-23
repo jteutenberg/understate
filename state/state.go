@@ -37,10 +37,10 @@ func NewState() *State {
 	}
 }
 
-func (s *State) Answer(p *core.Predicate) <-chan []*core.Atomic {
+func (s *State) Answer(p *core.Predicate, halt <-chan bool) <-chan *core.Predicate {
 	trueFacts := s.TrueFacts[p.Definition.Functor]
 	falseFacts := s.FalseFacts[p.Definition.Functor]
-	answer := make(chan []*core.Atomic)
+	answers := make(chan *core.Predicate)
 	go func() {
 		// if this is a ground predicate and is in falseFacts, then
 		// send a Terminate token and close the channel
@@ -48,28 +48,35 @@ func (s *State) Answer(p *core.Predicate) <-chan []*core.Atomic {
 		if isFact {
 			for _, fact := range falseFacts {
 				if fact.CanUnify(p) {
-					answer <- nil
-					close(answer)
-					return
+					answers <- core.Terminate
+					close(answers)
+					goto done
 				}
 			}
 		}
 		for _, fact := range trueFacts {
 			if p.CanUnify(fact) {
-				// then return this fact's values
-				values := make([]*core.Atomic, len(p.VarRefs))
-				for i, varRef := range fact.VarRefs {
-					values[i] = varRef.Dereference().Ref.(*core.Atomic)
-				}
-				answer <- values
+				answers <- fact
 				if isFact {
 					break
 				}
+				//if halt has been closed, end now
+				select {
+				case <-halt:
+					goto done
+				default:
+					// continue
+				}
 			}
 		}
-		close(answer)
+	done:
+		close(answers)
 	}()
-	return answer
+	return answers
+}
+
+func (s *State) String() string {
+	return "A state"
 }
 
 func (s *State) GetAtomic(name string, t *core.Type) *core.Atomic {

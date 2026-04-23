@@ -2,6 +2,7 @@ package knowledgebase_test
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"github.com/jteutenberg/understate/core"
 	"github.com/jteutenberg/understate/knowledgebase"
 	"github.com/jteutenberg/understate/rules"
+	"github.com/jteutenberg/understate/state"
 )
 
 func TestParseArguments(t *testing.T) {
@@ -96,7 +98,7 @@ func TestParseClausePredicate(t *testing.T) {
 	}
 }
 
-func TestPreparedExamples(t *testing.T) {
+func relationsKnowledgeBase() (*knowledgebase.KnowledgeBase, *rules.RuleMachine) {
 	kb := knowledgebase.NewKnowledgeBase()
 	rules := rules.NewRuleMachine(kb, kb.State)
 	kb.AddAnswerer(rules)
@@ -104,8 +106,6 @@ func TestPreparedExamples(t *testing.T) {
 		Name:    "Person",
 		Atomics: bitset.NewIntSet(),
 	}
-	//kb.AddAtomic("sam", person)
-	//kb.AddAtomic("alex", person)
 	kb.AddPredicateDefinition(&core.PredicateDefinition{
 		Functor: "parent",
 		ArgDefinitions: []core.ArgumentDefinition{
@@ -127,8 +127,43 @@ func TestPreparedExamples(t *testing.T) {
 			{Label: "Grandchild", Type: person},
 		},
 	})
+	return kb, rules
+}
 
-	file, err := os.Open("../tests/input2.txt")
+func linesKnowledgeBase() (*knowledgebase.KnowledgeBase, *rules.RuleMachine) {
+	kb := knowledgebase.NewKnowledgeBase()
+	rules := rules.NewRuleMachine(kb, kb.State)
+	kb.AddAnswerer(rules)
+	kb.AddPredicateDefinition(&core.PredicateDefinition{
+		Functor: "point",
+		ArgDefinitions: []core.ArgumentDefinition{
+			{Label: "X", Type: state.Numeric},
+			{Label: "Y", Type: state.Numeric},
+		},
+	})
+	kb.AddPredicateDefinition(&core.PredicateDefinition{
+		Functor: "line",
+		ArgDefinitions: []core.ArgumentDefinition{
+			{Label: "A", Type: nil},
+			{Label: "B", Type: nil},
+		},
+	})
+	return kb, rules
+}
+
+func TestPreparedExamples(t *testing.T) {
+	doPreparedExamples(t, false)
+}
+func TestPreparedExamplesHaltEarly(t *testing.T) {
+	doPreparedExamples(t, true)
+}
+
+func doPreparedExamples(t *testing.T, haltEarly bool) {
+	kb, rules := relationsKnowledgeBase()
+	//file, err := os.Open("../tests/input1.txt")
+	file, err := os.Open("../tests/input2a.txt")
+	//kb, rules := linesKnowledgeBase()
+	//file, err := os.Open("../tests/input3.txt")
 	if err != nil {
 		t.Fatalf("failed to open test input file: %v", err)
 	}
@@ -164,16 +199,22 @@ func TestPreparedExamples(t *testing.T) {
 				continue
 			}
 			if p, ok := parsed.(*core.Predicate); ok {
+				fmt.Printf("parsed: %s %v\n", p.String(), p.IsFact())
 				if p.IsFact() {
 					kb.SetTrue(p)
 				} else {
-					answers := kb.Answer(p)
+					halt := make(chan bool)
+					answers := kb.Answer(p, halt)
 					for ans := range answers {
-						if ans == nil {
+						if ans == nil || ans == core.Terminate {
 							t.Logf("%s: Done.", p.String())
 							break
 						}
 						t.Logf("%s -> %v", p.String(), ans)
+						if haltEarly {
+							close(halt)
+							haltEarly = false
+						}
 					}
 				}
 			}

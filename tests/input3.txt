@@ -1,0 +1,8 @@
+point(1,2)
+point(3,4)
+point(1,4)
+line(point(1,2), point(3,4))
+line(point(1,4), point(1,2))
+line(point(1,4), point(3,4))
+
+line(point(1,X),point(3,Y))

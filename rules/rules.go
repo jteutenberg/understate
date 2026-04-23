@@ -110,9 +110,10 @@ func (rm *RuleMachine) AddRule(rule *Rule) {
 	rm.rules = append(rm.rules, rule)
 }
 
-func (rm *RuleMachine) Answer(p *core.Predicate) <-chan []*core.Atomic {
-	answer := make(chan []*core.Atomic)
+func (rm *RuleMachine) Answer(p *core.Predicate, halt <-chan bool) <-chan *core.Predicate {
+	answers := make(chan *core.Predicate)
 	go func() {
+	loopRules:
 		for _, rule := range rm.rules {
 			if rule.lhs.CanUnify(p) {
 				unified := rule.Clone()
@@ -122,32 +123,53 @@ func (rm *RuleMachine) Answer(p *core.Predicate) <-chan []*core.Atomic {
 					fmt.Printf("error unifying rule %v with %v: %v", rule.lhs, p, err)
 					continue
 				}
-				rm.checkAnswers(unified.rhs, unified.sharedVars)
+				rm.checkAnswers(unified, answers, halt)
+				select {
+				case <-halt:
+					break loopRules
+				default:
+					// continue
+				}
 			}
 		}
-		close(answer)
+		close(answers)
 	}()
-	return answer
+	return answers
 }
 
-func (rm *RuleMachine) checkAnswers(rhs []*core.Predicate, sharedVars map[string]*core.VariableReference) {
-	stack := make([]<-chan []*core.Atomic, 0, len(rhs))
-	stack = append(stack, rm.subAnswerer.Answer(rhs[0]))
-	varStack := make([]map[string]*core.VariableReference, 0, len(rhs))
-	varStack = append(varStack, sharedVars)
-	rhsStack := make([][]*core.Predicate, 0, len(rhs))
-	rhsStack = append(rhsStack, rhs)
+func (rm *RuleMachine) String() string {
+	return "A rule machine"
+}
+
+func (rm *RuleMachine) checkAnswers(rule *Rule, answers chan<- *core.Predicate, halt <-chan bool) {
+	haltStack := make([]chan bool, 0, len(rule.rhs))
+	haltStack = append(haltStack, make(chan bool))
+	stack := make([]<-chan *core.Predicate, 0, len(rule.rhs))
+	stack = append(stack, rm.subAnswerer.Answer(rule.rhs[0], haltStack[0]))
+	ruleStack := make([]*Rule, 0, len(rule.rhs))
+	ruleStack = append(ruleStack, rule)
 	for {
+		select {
+		case <-halt:
+			// terminate all sub-answerers
+			for _, halt := range haltStack {
+				close(halt)
+			}
+			return
+		default:
+			// continue
+		}
 		ans := <-stack[len(stack)-1]
 		//fmt.Println("Answer at depth", len(stack), "is", ans)
-		if ans == nil {
+		if ans == core.Terminate || ans == nil {
 			// no more answers
 			stack = stack[:len(stack)-1]
 			if len(stack) == 0 {
 				// we're done
 				return
 			}
-			rhsStack = rhsStack[:len(rhsStack)-1]
+			ruleStack = ruleStack[:len(ruleStack)-1]
+			haltStack = haltStack[:len(haltStack)-1]
 			// backtrack to the previous RHS version
 			//fmt.Println("Backtrack to previous rule", len(stack))
 			continue
@@ -157,38 +179,22 @@ func (rm *RuleMachine) checkAnswers(rhs []*core.Predicate, sharedVars map[string
 		// NOTE: if the next rule is a fact already, we can skip over the cloning bit
 		// as there is no need to unify the arguments
 
-		// clone the current state, ready to update
-		nextSharedVars := cloneSharedVars(varStack[len(varStack)-1])
-		nextRHS := make([]*core.Predicate, len(rhsStack[len(rhsStack)-1]))
-		for i, nextPred := range rhsStack[len(rhsStack)-1] {
-			nextRHS[i] = nextPred.CloneWithVars(nextSharedVars)
-		}
 		// unify returned atomics
 		//fmt.Println("Working on answers for", nextRHS[len(stack)-1])
-		unifies := true
-		for i, varRef := range nextRHS[len(stack)-1].VarRefs {
-			if varRef.CanUnify(ans[i]) {
-				varRef.Unify(ans[i])
-			} else {
-				// try the next answer instead
-				unifies = false
-				//fmt.Println("Cannot unify", varRef, "with", ans[i])
-				break
-			}
-		}
-		if !unifies {
+		if !ruleStack[len(stack)-1].rhs[len(stack)-1].CanUnify(ans) {
 			continue
 		}
-		//fmt.Println("After unifying with last rule answer:", nextRHS[len(stack)-1])
-		if len(stack) == len(rhs) {
-			// TODO: yield the answer
-			fmt.Println("Got an answer!", nextSharedVars)
+		nextRule := ruleStack[len(stack)-1].Clone()
+		nextRule.rhs[len(stack)-1].Unify(ans)
+
+		if len(stack) == len(rule.rhs) {
+			answers <- nextRule.lhs
 		} else {
 			// recurse
 			//fmt.Println("Move down to next rule", len(stack))
-			stack = append(stack, rm.subAnswerer.Answer(nextRHS[len(stack)]))
-			varStack = append(varStack, nextSharedVars)
-			rhsStack = append(rhsStack, nextRHS)
+			haltStack = append(haltStack, make(chan bool))
+			stack = append(stack, rm.subAnswerer.Answer(nextRule.rhs[len(stack)], haltStack[len(haltStack)-1]))
+			ruleStack = append(ruleStack, nextRule)
 		}
 	}
 }

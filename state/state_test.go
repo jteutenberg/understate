@@ -103,14 +103,14 @@ func TestStateAnswerQuery(t *testing.T) {
 			{Label: "Y", Ref: nil},
 		},
 	}
-	answer := state.Answer(query)
+	answer := state.Answer(query, make(chan bool))
 	ansCount := 0
 	for ans := range answer {
 		ansCount++
 		//any order is valid
-		if !((ans[0] == atomics["cow"] && ans[1] == atomics["grass"]) ||
-			(ans[0] == atomics["cow"] && ans[1] == atomics["apple"])) {
-			t.Errorf("unexpected answer %v eats %v", ans[0], ans[1])
+		if !((ans.VarRefs[0].Ref == atomics["cow"] && ans.VarRefs[1].Ref == atomics["grass"]) ||
+			(ans.VarRefs[0].Ref == atomics["cow"] && ans.VarRefs[1].Ref == atomics["apple"])) {
+			t.Errorf("unexpected answer %v eats %v", ans.VarRefs[0], ans.VarRefs[1])
 		}
 	}
 	if ansCount != 2 {
@@ -130,15 +130,15 @@ func TestStateAnswerQueryPermutations(t *testing.T) {
 			{Label: "Y", Ref: nil},
 		},
 	}
-	answer := state.Answer(query)
+	answer := state.Answer(query, make(chan bool))
 	ansCount := 0
 	for ans := range answer {
 		ansCount++
 		//any order is valid
-		if !((ans[0] == atomics["cow"] && ans[1] == atomics["grass"]) ||
-			(ans[0] == atomics["dog"] && ans[1] == atomics["beef"]) ||
-			(ans[0] == atomics["cow"] && ans[1] == atomics["apple"])) {
-			t.Errorf("unexpected answer %v eats %v", ans[0], ans[1])
+		if !((ans.VarRefs[0].Ref == atomics["cow"] && ans.VarRefs[1].Ref == atomics["grass"]) ||
+			(ans.VarRefs[0].Ref == atomics["dog"] && ans.VarRefs[1].Ref == atomics["beef"]) ||
+			(ans.VarRefs[0].Ref == atomics["cow"] && ans.VarRefs[1].Ref == atomics["apple"])) {
+			t.Errorf("unexpected answer %v eats %v", ans.VarRefs[0], ans.VarRefs[1])
 		}
 	}
 	if ansCount != 3 {
@@ -157,13 +157,13 @@ func TestStateAnswerQueryFact(t *testing.T) {
 			{Label: "Y", Ref: atomics["grass"]},
 		},
 	}
-	answer := state.Answer(query)
+	answer := state.Answer(query, make(chan bool))
 	ansCount := 0
 	for ans := range answer {
 		ansCount++
 		//any order is valid
-		if !(ans[0] == atomics["cow"] && ans[1] == atomics["grass"]) {
-			t.Errorf("unexpected answer %v eats %v", ans[0], ans[1])
+		if !(ans.VarRefs[0].Ref == atomics["cow"] && ans.VarRefs[1].Ref == atomics["grass"]) {
+			t.Errorf("unexpected answer %v eats %v", ans.VarRefs[0], ans.VarRefs[1])
 		}
 	}
 	if ansCount != 1 {

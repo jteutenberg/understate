@@ -50,3 +50,54 @@ func TestSimpleUnify(t *testing.T) {
 		t.Errorf("unified predicate: %v", predA)
 	}
 }
+
+func TestCloneVars(t *testing.T) {
+	def := &PredicateDefinition{
+		Functor: "eat",
+		ArgDefinitions: []ArgumentDefinition{
+			{Label: "Eater", Type: nil},
+			{Label: "Food", Type: nil},
+		},
+	}
+	pred := &Predicate{
+		Definition: def,
+		VarRefs: []*VariableReference{
+			{Label: "X", Ref: nil},
+			{Label: "Y", Ref: nil},
+		},
+	}
+	pred.VarRefs[1].Ref = pred.VarRefs[0]
+	cloned := pred.Clone().(*Predicate)
+	if cloned.VarRefs[1].Dereference() != cloned.VarRefs[0].Dereference() {
+		t.Errorf("cloning did not preserve shared variable")
+	}
+	if cloned.String() != "eat(X, X)" {
+		t.Errorf("cloned predicate: %v", cloned)
+	}
+}
+
+func TestCloneAtomic(t *testing.T) {
+	def := &PredicateDefinition{
+		Functor: "eat",
+		ArgDefinitions: []ArgumentDefinition{
+			{Label: "Eater", Type: nil},
+			{Label: "Food", Type: nil},
+		},
+	}
+	rat := &Atomic{Index: 1, Value: "rat"}
+	pred := &Predicate{
+		Definition: def,
+		VarRefs: []*VariableReference{
+			{Label: "X", Ref: rat},
+			{Label: "Y", Ref: nil},
+		},
+	}
+	pred.VarRefs[1].Ref = pred.VarRefs[0]
+	cloned := pred.Clone().(*Predicate)
+	if cloned.VarRefs[1].Dereference() != cloned.VarRefs[0].Dereference() {
+		t.Errorf("cloning did not preserve structure")
+	}
+	if cloned.String() != "eat(rat, rat)" {
+		t.Errorf("cloned predicate: %v", cloned)
+	}
+}

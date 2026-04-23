@@ -4,6 +4,9 @@ import (
 	"fmt"
 )
 
+var Terminate = &Predicate{Definition: &PredicateDefinition{Functor: "Terminate"}}
+var Pass = &Predicate{Definition: &PredicateDefinition{Functor: "Pass"}}
+
 type ArgumentDefinition struct {
 	Label         string
 	Type          *Type
@@ -32,7 +35,7 @@ type Predicate struct {
 }
 
 type Answerer interface {
-	Answer(p *Predicate) <-chan []*Atomic
+	Answer(p *Predicate, halt <-chan bool) <-chan *Predicate
 }
 
 func (p *Predicate) String() string {
@@ -75,7 +78,17 @@ func (r *VariableReference) String() string {
 	if v, ok := r.Ref.(*VariableReference); ok {
 		return v.String()
 	}
+	if p, ok := r.Ref.(*Predicate); ok {
+		return p.String()
+	}
 	return "BadRef"
+}
+
+func (r *VariableReference) StringVerbose() string {
+	if v, ok := r.Ref.(*VariableReference); ok {
+		return r.Label + " -> " + v.StringVerbose()
+	}
+	return "[" + r.Label + "]" + r.String()
 }
 
 func (r *VariableReference) Dereference() *VariableReference {
@@ -86,22 +99,37 @@ func (r *VariableReference) Dereference() *VariableReference {
 }
 
 func (r *VariableReference) Unify(other Unifiable) error {
-	vr := r.Dereference()
-	if vr.Ref == nil {
-		// point directly to the other
-		r.Ref = other
-		return nil
-	}
-	r.Ref = vr.Ref
-	if other, ok := other.(*VariableReference); ok {
-		other = other.Dereference()
-		if other.Ref == nil {
+	// check for final referencing two non-variables. Call their Unify.
+	finalR := r.Dereference()
+	finalOtherRef := other
+	if vRefOther, ok := other.(*VariableReference); ok {
+		finalOther := vRefOther.Dereference()
+		finalOtherRef = finalOther.Ref
+		// check for same variable reference
+		if finalR == finalOther {
 			return nil
 		}
-		return vr.Ref.Unify(other.Ref)
+		// if this is a variable too, then just point to the other
+		if finalR.Ref == nil {
+			finalR.Ref = finalOther
+			return nil
+		} else if finalOtherRef == nil {
+			return finalOther.Unify(finalR.Ref)
+		}
 	}
-	// defer unification to a non-variable
-	return r.Ref.Unify(other)
+	// we now have sorted the cases for
+	// - both were the same variable
+	// - both were different variables
+	// - the other was a variable reference to something concrete
+
+	// now if this is variable but other is directly concrete
+	if finalR.Ref == nil {
+		finalR.Ref = finalOtherRef
+		return nil
+	}
+
+	// and finally if both are non-variables, unify them
+	return finalR.Ref.Unify(finalOtherRef)
 }
 
 func (r *VariableReference) CanUnify(other Unifiable) bool {
@@ -175,6 +203,18 @@ func (a *Predicate) CloneWithVars(vars map[string]*VariableReference) *Predicate
 		VarRefs:    make([]*VariableReference, len(a.VarRefs)),
 	}
 	for i, varRef := range a.VarRefs {
+		// handle recursive predicates
+		d := varRef.Dereference()
+		if p2, ok := d.Ref.(*Predicate); ok {
+			// find the variable references for this predicate too
+			p2 = p2.CloneWithVars(vars)
+			// and make a new reference to it, not shared.
+			p.VarRefs[i] = &VariableReference{
+				Label: varRef.Label,
+				Ref:   p2,
+			}
+			continue
+		}
 		p.VarRefs[i] = vars[varRef.Label]
 	}
 	return p
@@ -186,24 +226,36 @@ func (a *Predicate) Clone() Unifiable {
 		VarRefs:    make([]*VariableReference, len(a.VarRefs)),
 	}
 	newVars := make(map[string]*VariableReference)
+	needPredicates := make([]*VariableReference, 0, len(a.VarRefs))
+	origPredicates := make([]*Predicate, 0, len(a.VarRefs))
+	// clone everything except predicates
 	for i, varRef := range a.VarRefs {
-		newVars[a.VarRefs[i].Label] = &VariableReference{
-			Label: varRef.Label,
-			Ref:   nil,
-		}
-	}
-	for i, varRef := range a.VarRefs {
-		newVar := newVars[varRef.Label]
-		if varRef.Ref != nil {
-			if existingRef, ok := varRef.Ref.(*VariableReference); ok {
-				// point to the new equivalent
-				newVar.Ref = newVars[existingRef.Label]
+		v := varRef.Dereference()
+		if _, ok := newVars[v.Label]; !ok {
+			if op, pok := v.Ref.(*Predicate); pok {
+				vr := &VariableReference{
+					Label: v.Label,
+					Ref:   nil,
+				}
+				newVars[v.Label] = vr
+				needPredicates = append(needPredicates, vr)
+				origPredicates = append(origPredicates, op)
 			} else {
-				newVar.Ref = existingRef.Clone()
+				vr := &VariableReference{
+					Label: v.Label,
+					Ref:   nil,
+				}
+				if v.Ref != nil {
+					vr.Ref = v.Ref.Clone()
+				}
+				newVars[v.Label] = vr
 			}
-			newVar.Ref = varRef.Ref.Clone()
 		}
-		p.VarRefs[i] = newVar
+		p.VarRefs[i] = newVars[v.Label]
+	}
+	// clone the predicates
+	for i, vr := range needPredicates {
+		vr.Ref = origPredicates[i].CloneWithVars(newVars)
 	}
 	return p
 }
