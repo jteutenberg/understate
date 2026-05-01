@@ -79,6 +79,27 @@ func (s *State) String() string {
 	return "A state"
 }
 
+func (s *State) GetNumericAtomic(index int) *core.Atomic {
+	if index < 0 {
+		return nil
+	}
+
+	if s.numericAtomics[index] == nil || index >= len(s.numericAtomics) {
+		a := &core.Atomic{
+			Index: index,
+			Value: strconv.Itoa(index),
+			Type:  Numeric,
+		}
+		if index < len(s.numericAtomics) {
+			s.numericAtomics[index] = a
+		} else {
+			s.numericAtomics = append(s.numericAtomics, a)
+		}
+		return a
+	}
+	return s.numericAtomics[index]
+}
+
 func (s *State) GetAtomic(name string, t *core.Type) *core.Atomic {
 	if a := s.atomicsByName[name]; a != nil {
 		return a
@@ -89,23 +110,7 @@ func (s *State) GetAtomic(name string, t *core.Type) *core.Atomic {
 		if err != nil || atomicIndex < 0 {
 			return nil
 		}
-		if atomicIndex >= len(s.numericAtomics) || s.numericAtomics[atomicIndex] == nil {
-			// create a new numeric atomic
-			atomic := &core.Atomic{
-				Index: atomicIndex,
-				Value: name,
-				Type:  Numeric,
-			}
-			if atomicIndex >= 1000000 {
-				// no caching
-				return atomic
-			}
-			for len(s.numericAtomics) <= atomicIndex {
-				s.numericAtomics = append(s.numericAtomics, nil)
-			}
-			s.numericAtomics[atomicIndex] = atomic
-		}
-		return s.numericAtomics[atomicIndex]
+		return s.GetNumericAtomic(atomicIndex)
 	}
 	//handle non-numeric atomics
 	atomicIndex := uint(0)

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/jteutenberg/bitset-go"
+	"github.com/jteutenberg/understate/calculator"
 	"github.com/jteutenberg/understate/core"
 	"github.com/jteutenberg/understate/knowledgebase"
 	"github.com/jteutenberg/understate/rules"
@@ -102,6 +103,8 @@ func relationsKnowledgeBase() (*knowledgebase.KnowledgeBase, *rules.RuleMachine)
 	kb := knowledgebase.NewKnowledgeBase()
 	rules := rules.NewRuleMachine(kb, kb.State)
 	kb.AddAnswerer(rules)
+	kb.AddAnswerer(calculator.NewCalculator(kb.State))
+	kb.AddPredicateDefinition(calculator.Gt)
 	person := &core.Type{
 		Name:    "Person",
 		Atomics: bitset.NewIntSet(),
@@ -161,7 +164,7 @@ func TestPreparedExamplesHaltEarly(t *testing.T) {
 func doPreparedExamples(t *testing.T, haltEarly bool) {
 	kb, rules := relationsKnowledgeBase()
 	//file, err := os.Open("../tests/input1.txt")
-	file, err := os.Open("../tests/input2a.txt")
+	file, err := os.Open("../tests/input4.txt")
 	//kb, rules := linesKnowledgeBase()
 	//file, err := os.Open("../tests/input3.txt")
 	if err != nil {
@@ -179,6 +182,7 @@ func doPreparedExamples(t *testing.T, haltEarly bool) {
 		if line[0] == '#' {
 			continue
 		}
+		isQuery := line[len(line)-1] == '?'
 		lineNum++
 		// if line contains ':-', then parse it as a rule
 		if strings.Contains(line, ":-") {
@@ -200,17 +204,29 @@ func doPreparedExamples(t *testing.T, haltEarly bool) {
 			}
 			if p, ok := parsed.(*core.Predicate); ok {
 				fmt.Printf("parsed: %s %v\n", p.String(), p.IsFact())
-				if p.IsFact() {
+				if p.IsFact() && !isQuery {
 					kb.SetTrue(p)
 				} else {
 					halt := make(chan bool)
 					answers := kb.Answer(p, halt)
+					answered := false
 					for ans := range answers {
 						if ans == nil || ans == core.Terminate {
-							t.Logf("%s: Done.", p.String())
+							if p.IsFact() {
+								if answered {
+									t.Logf("%s: True.", p.String())
+								} else {
+									t.Logf("%s: False.", p.String())
+								}
+							} else {
+								t.Logf("%s: Done.", p.String())
+							}
 							break
 						}
-						t.Logf("%s -> %v", p.String(), ans)
+						answered = true
+						if !p.IsFact() {
+							t.Logf("%s -> %v", p.String(), ans)
+						}
 						if haltEarly {
 							close(halt)
 							haltEarly = false

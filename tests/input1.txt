@@ -1,7 +1,7 @@
-parent(sam, alex)
-parent(jo,alex)
-parent(sam, sal)
-parent(nina, jo)
+parent(sam, alex).
+parent(jo,alex).
+parent(sam, sal).
+parent(nina, jo).
 
 # sal, alex; jo, alex
 parent(X, alex)

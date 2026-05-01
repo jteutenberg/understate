@@ -1,10 +1,10 @@
-parent(sam, alex)
-parent(jo,alex)
-parent(sam, sal)
-parent(nina, jo)
+parent(sam, alex).
+parent(jo,alex).
+parent(sam, sal).
+parent(nina, jo).
 
-not(parent(nina, jo))
-not(parent(jo, nina))
+not(parent(nina, jo))?
+not(parent(jo, nina))?
 
 eq(nina, X)
 eq(X, jo)

@@ -1,0 +1,8 @@
+
+
+#solve(person(alex, Colour1, 1), person(Name2, red, 2)) :- person(A, B, C), person(D, E, F), F > C, ???
+
+gt(5,4)?
+gt(4,4)?
+gt(4,5)?
+gt(4,X)
