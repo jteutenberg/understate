@@ -37,7 +37,7 @@ func NewState() *State {
 	}
 }
 
-func (s *State) Answer(p *core.Predicate, halt <-chan bool) <-chan *core.Predicate {
+func (s *State) Answer(p *core.Predicate, frame *core.Frame, halt <-chan bool) <-chan *core.Predicate {
 	trueFacts := s.TrueFacts[p.Definition.Functor]
 	falseFacts := s.FalseFacts[p.Definition.Functor]
 	answers := make(chan *core.Predicate)

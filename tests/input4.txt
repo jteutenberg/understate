@@ -1,8 +1,12 @@
 
 
 #solve(person(alex, Colour1, 1), person(Name2, red, 2)) :- person(A, B, C), person(D, E, F), F > C, ???
-
 gt(5,4)?
 gt(4,4)?
 gt(4,5)?
 gt(4,X)
+sum(2,3,X)
+sum(X,3,5)
+sum(2,X,5)
+sum(X,Y,5)
+sum(X,X,6)

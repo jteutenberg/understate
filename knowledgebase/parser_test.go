@@ -17,7 +17,8 @@ import (
 
 func TestParseArguments(t *testing.T) {
 	kb := knowledgebase.NewKnowledgeBase()
-	args, err := kb.ParseArguments("X, Y, Z", nil)
+	frame := core.NewFrame()
+	args, err := kb.ParseArguments("X, Y, Z", nil, frame)
 	// three variables
 	if err != nil {
 		t.Errorf("error parsing arguments: %v", err)
@@ -32,7 +33,8 @@ func TestParseArguments(t *testing.T) {
 
 func TestParseClauseAtomic(t *testing.T) {
 	kb := knowledgebase.NewKnowledgeBase()
-	atomic, next, err := kb.ParseClause("cow", nil)
+	frame := core.NewFrame()
+	atomic, next, err := kb.ParseClause("cow", nil, frame)
 	if err != nil {
 		t.Errorf("error parsing atomic: %v", err)
 	}
@@ -46,7 +48,8 @@ func TestParseClauseAtomic(t *testing.T) {
 
 func TestParseClauseAtomicWithTrailingChar(t *testing.T) {
 	kb := knowledgebase.NewKnowledgeBase()
-	atomic, next, err := kb.ParseClause("cow, dog", nil)
+	frame := core.NewFrame()
+	atomic, next, err := kb.ParseClause("cow, dog", nil, frame)
 	if err != nil {
 		t.Errorf("error parsing atomic: %v", err)
 	}
@@ -60,7 +63,8 @@ func TestParseClauseAtomicWithTrailingChar(t *testing.T) {
 
 func TestParseClauseVariable(t *testing.T) {
 	kb := knowledgebase.NewKnowledgeBase()
-	variable, next, err := kb.ParseClause("Xenon", nil)
+	frame := core.NewFrame()
+	variable, next, err := kb.ParseClause("Xenon", nil, frame)
 	if err != nil {
 		t.Errorf("error parsing variable: %v", err)
 	}
@@ -81,7 +85,8 @@ func TestParseClausePredicate(t *testing.T) {
 			{Label: "B", Type: nil},
 		},
 	})
-	predicate, next, err := kb.ParseClause("eat(X, Y)", nil)
+	frame := core.NewFrame()
+	predicate, next, err := kb.ParseClause("eat(X, Y)", nil, frame)
 	if err != nil {
 		t.Errorf("error parsing predicate: %v", err)
 	}
@@ -105,6 +110,7 @@ func relationsKnowledgeBase() (*knowledgebase.KnowledgeBase, *rules.RuleMachine)
 	kb.AddAnswerer(rules)
 	kb.AddAnswerer(calculator.NewCalculator(kb.State))
 	kb.AddPredicateDefinition(calculator.Gt)
+	kb.AddPredicateDefinition(calculator.Sum)
 	person := &core.Type{
 		Name:    "Person",
 		Atomics: bitset.NewIntSet(),
@@ -185,6 +191,7 @@ func doPreparedExamples(t *testing.T, haltEarly bool) {
 		isQuery := line[len(line)-1] == '?'
 		lineNum++
 		// if line contains ':-', then parse it as a rule
+		frame := core.NewFrame()
 		if strings.Contains(line, ":-") {
 			rule, err := kb.ParseRule(line)
 			if err != nil {
@@ -193,7 +200,7 @@ func doPreparedExamples(t *testing.T, haltEarly bool) {
 			}
 			rules.AddRule(rule)
 		} else {
-			parsed, _, err := kb.ParseClause(line, nil)
+			parsed, _, err := kb.ParseClause(line, nil, frame)
 			if err != nil {
 				t.Errorf("error parsing line %d (%q): %v", lineNum, line, err)
 				continue
@@ -203,12 +210,13 @@ func doPreparedExamples(t *testing.T, haltEarly bool) {
 				continue
 			}
 			if p, ok := parsed.(*core.Predicate); ok {
-				fmt.Printf("parsed: %s %v\n", p.String(), p.IsFact())
+				fmt.Printf("parsed: %s is fact: %v\n", p.String(), p.IsFact())
 				if p.IsFact() && !isQuery {
 					kb.SetTrue(p)
 				} else {
+					doHalt := haltEarly
 					halt := make(chan bool)
-					answers := kb.Answer(p, halt)
+					answers := kb.Answer(p, frame, halt)
 					answered := false
 					for ans := range answers {
 						if ans == nil || ans == core.Terminate {
@@ -225,11 +233,17 @@ func doPreparedExamples(t *testing.T, haltEarly bool) {
 						}
 						answered = true
 						if !p.IsFact() {
-							t.Logf("%s -> %v", p.String(), ans)
+							fmt.Printf("%s -> %v %v\n", p.String(), ans, p.CanUnify(ans))
+							f2 := frame.Clone()
+							p2 := p.CloneInFrame(f2)
+							uerr := p2.Unify(ans)
+							if uerr != nil {
+								fmt.Println("Error unifying: ", uerr)
+							}
 						}
-						if haltEarly {
+						if doHalt {
 							close(halt)
-							haltEarly = false
+							doHalt = false
 						}
 					}
 				}

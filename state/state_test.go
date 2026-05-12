@@ -92,6 +92,7 @@ func basicState(defs map[string]*core.PredicateDefinition, atomics map[string]*c
 }
 
 func TestStateAnswerQuery(t *testing.T) {
+	frame := core.NewFrame()
 	_, defs, atomics := setupTest()
 	state := basicState(defs, atomics)
 
@@ -103,7 +104,7 @@ func TestStateAnswerQuery(t *testing.T) {
 			{Label: "Y", Ref: nil},
 		},
 	}
-	answer := state.Answer(query, make(chan bool))
+	answer := state.Answer(query, frame, make(chan bool))
 	ansCount := 0
 	for ans := range answer {
 		ansCount++
@@ -119,6 +120,7 @@ func TestStateAnswerQuery(t *testing.T) {
 }
 
 func TestStateAnswerQueryPermutations(t *testing.T) {
+	frame := core.NewFrame()
 	_, defs, atomics := setupTest()
 	state := basicState(defs, atomics)
 
@@ -130,7 +132,7 @@ func TestStateAnswerQueryPermutations(t *testing.T) {
 			{Label: "Y", Ref: nil},
 		},
 	}
-	answer := state.Answer(query, make(chan bool))
+	answer := state.Answer(query, frame, make(chan bool))
 	ansCount := 0
 	for ans := range answer {
 		ansCount++
@@ -146,6 +148,7 @@ func TestStateAnswerQueryPermutations(t *testing.T) {
 	}
 }
 func TestStateAnswerQueryFact(t *testing.T) {
+	frame := core.NewFrame()
 	_, defs, atomics := setupTest()
 	state := basicState(defs, atomics)
 
@@ -157,7 +160,7 @@ func TestStateAnswerQueryFact(t *testing.T) {
 			{Label: "Y", Ref: atomics["grass"]},
 		},
 	}
-	answer := state.Answer(query, make(chan bool))
+	answer := state.Answer(query, frame, make(chan bool))
 	ansCount := 0
 	for ans := range answer {
 		ansCount++

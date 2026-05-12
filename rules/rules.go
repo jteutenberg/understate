@@ -16,9 +16,9 @@ type RuleMachine struct {
 }
 
 type Rule struct {
-	lhs        *core.Predicate
-	rhs        []*core.Predicate
-	sharedVars map[string]*core.VariableReference
+	lhs   *core.Predicate
+	rhs   []*core.Predicate
+	frame *core.Frame
 }
 
 var Cut = &core.Predicate{
@@ -38,53 +38,26 @@ func NewRuleMachine(subAnswerer core.Answerer, state *state.State) *RuleMachine 
 // NewRule creates a new Rule from the RHS and LHS predicates, with their
 // variable references being modified so that they are shared based on
 // their labels
-func NewRule(lhs *core.Predicate, rhs []*core.Predicate) *Rule {
-	// share variable references by name
-	sharedVars := make(map[string]*core.VariableReference)
-	for i, varRef := range lhs.VarRefs {
-		varLabel := varRef.Label
-		if existingVarRef, ok := sharedVars[varLabel]; ok {
-			// same label, use the same variable reference
-			lhs.VarRefs[i] = existingVarRef
-		} else {
-			sharedVars[varLabel] = varRef
-		}
-	}
-	for _, rhsPred := range rhs {
-		for i, varRef := range rhsPred.VarRefs {
-			if existingVarRef, ok := sharedVars[varRef.Label]; ok {
-				rhsPred.VarRefs[i] = existingVarRef
-			} else {
-				sharedVars[varRef.Label] = varRef
-			}
-		}
-	}
+// the frame passed in should have been used to create all LHS and RHS predicates
+func NewRule(lhs *core.Predicate, rhs []*core.Predicate, frame *core.Frame) *Rule {
 	return &Rule{
-		lhs:        lhs,
-		rhs:        rhs,
-		sharedVars: sharedVars,
+		lhs:   lhs.CloneInFrame(frame),
+		rhs:   rhs,
+		frame: frame,
 	}
-}
-
-func cloneSharedVars(sharedVars map[string]*core.VariableReference) map[string]*core.VariableReference {
-	newSharedVars := make(map[string]*core.VariableReference)
-	for label, varRef := range sharedVars {
-		newSharedVars[label] = varRef.Clone().(*core.VariableReference)
-	}
-	return newSharedVars
 }
 
 func (r *Rule) Clone() *Rule {
 	// new share variables map
-	sharedVars := cloneSharedVars(r.sharedVars)
+	frame := r.frame.Clone()
 	newRHS := make([]*core.Predicate, len(r.rhs))
 	for i, rhsPred := range r.rhs {
-		newRHS[i] = rhsPred.CloneWithVars(sharedVars)
+		newRHS[i] = rhsPred.CloneInFrame(frame)
 	}
 	rule := &Rule{
-		lhs:        r.lhs.CloneWithVars(sharedVars),
-		rhs:        newRHS,
-		sharedVars: sharedVars,
+		lhs:   r.lhs.CloneInFrame(frame),
+		rhs:   newRHS,
+		frame: frame,
 	}
 
 	return rule
@@ -95,12 +68,13 @@ func (r *Rule) avoidDuplicates(p *core.Predicate) {
 	for _, varRef := range p.VarRefs {
 		if varRef.Dereference().Ref == nil {
 			// a variable
-			if r.sharedVars[varRef.Label] != nil {
+			if r.frame.Vars[varRef.Label] != nil {
 				// rename to avoid duplicates after unification
-				vr := r.sharedVars[varRef.Label]
-				vr.Label = vr.Label + "_" + strconv.Itoa(len(r.sharedVars))
-				r.sharedVars[vr.Label] = vr
-				delete(r.sharedVars, varRef.Label)
+				oldLabel := varRef.Label
+				vr := r.frame.Vars[oldLabel]
+				vr.Label = oldLabel + "_" + strconv.Itoa(len(r.frame.Vars))
+				r.frame.Vars[vr.Label] = vr
+				delete(r.frame.Vars, oldLabel)
 			}
 		}
 	}
@@ -110,11 +84,13 @@ func (rm *RuleMachine) AddRule(rule *Rule) {
 	rm.rules = append(rm.rules, rule)
 }
 
-func (rm *RuleMachine) Answer(p *core.Predicate, halt <-chan bool) <-chan *core.Predicate {
+func (rm *RuleMachine) Answer(p *core.Predicate, frame *core.Frame, halt <-chan bool) <-chan *core.Predicate {
 	answers := make(chan *core.Predicate)
 	go func() {
 	loopRules:
 		for _, rule := range rm.rules {
+			// Note: conflicts between frame (from predicate) with rules frame
+			// are sorted below with unified.avoidDuplicates()
 			if rule.lhs.CanUnify(p) {
 				unified := rule.Clone()
 				unified.avoidDuplicates(p)
@@ -145,7 +121,9 @@ func (rm *RuleMachine) checkAnswers(rule *Rule, answers chan<- *core.Predicate, 
 	haltStack := make([]chan bool, 0, len(rule.rhs))
 	haltStack = append(haltStack, make(chan bool))
 	stack := make([]<-chan *core.Predicate, 0, len(rule.rhs))
-	stack = append(stack, rm.subAnswerer.Answer(rule.rhs[0], haltStack[0]))
+	//b ecause we are passing the frame, do we need to clone the rule?
+	// No. It was cloned just before calling
+	stack = append(stack, rm.subAnswerer.Answer(rule.rhs[0], rule.frame, haltStack[0]))
 	ruleStack := make([]*Rule, 0, len(rule.rhs))
 	ruleStack = append(ruleStack, rule)
 	for {
@@ -193,7 +171,7 @@ func (rm *RuleMachine) checkAnswers(rule *Rule, answers chan<- *core.Predicate, 
 			// recurse
 			//fmt.Println("Move down to next rule", len(stack))
 			haltStack = append(haltStack, make(chan bool))
-			stack = append(stack, rm.subAnswerer.Answer(nextRule.rhs[len(stack)], haltStack[len(haltStack)-1]))
+			stack = append(stack, rm.subAnswerer.Answer(nextRule.rhs[len(stack)], nextRule.frame, haltStack[len(haltStack)-1]))
 			ruleStack = append(ruleStack, nextRule)
 		}
 	}

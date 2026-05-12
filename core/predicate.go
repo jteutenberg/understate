@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"strconv"
 )
 
 var Terminate = &Predicate{Definition: &PredicateDefinition{Functor: "Terminate"}}
@@ -34,8 +35,84 @@ type Predicate struct {
 	VarRefs    []*VariableReference
 }
 
+type Frame struct {
+	Vars   map[string]*VariableReference
+	nextID int
+}
+
 type Answerer interface {
-	Answer(p *Predicate, halt <-chan bool) <-chan *Predicate
+	Answer(p *Predicate, frame *Frame, halt <-chan bool) <-chan *Predicate
+}
+
+func NewFrame() *Frame {
+	return &Frame{
+		Vars:   make(map[string]*VariableReference),
+		nextID: 0,
+	}
+}
+
+// Clone a frame, including all predicates and atomics bound to variables
+func (frame *Frame) Clone() *Frame {
+	newSharedVars := make(map[string]*VariableReference)
+	for label, varRef := range frame.Vars {
+		// dereference everything
+		vr := varRef.Dereference()
+		label = vr.Label
+		if _, ok := newSharedVars[label]; ok {
+			continue
+		}
+		if vr.Ref != nil {
+			if p, ok := vr.Ref.(*Predicate); ok {
+				newSharedVars[label] = &VariableReference{
+					Label: label,
+					Ref:   p.CloneInFrame(frame),
+				}
+			} else {
+				// clone the variable bound to a non-predicate
+				newSharedVars[label] = vr.Clone().(*VariableReference)
+			}
+		} else {
+			// clone the unbound variable
+			newSharedVars[label] = vr.Clone().(*VariableReference)
+		}
+	}
+	return &Frame{
+		Vars:   newSharedVars,
+		nextID: frame.nextID,
+	}
+}
+
+// Create a new Predicate, constructing VariableReferences and updating the frame as required
+func NewPredicate(definition *PredicateDefinition, labels []string, args []Unifiable, frame *Frame) *Predicate {
+	p := &Predicate{
+		Definition: definition,
+		VarRefs:    make([]*VariableReference, len(labels)),
+	}
+	for i, label := range labels {
+		if varRef, ok := args[i].(*VariableReference); ok {
+			varRef = varRef.Dereference()
+			// if the variable reference is already in the frame, use it
+			if vr, ok := frame.Vars[varRef.Label]; ok {
+				p.VarRefs[i] = vr
+				continue
+			} else if varRef.Ref == nil {
+				// if it is truly variable, store using its label
+				frame.Vars[varRef.Label] = varRef
+				p.VarRefs[i] = frame.Vars[varRef.Label]
+				continue
+			}
+		}
+		// an atomic or predicate, possibly pointed to by a variable reference
+		// ensure a new unique label is used
+		frame.nextID++
+		label = "_?" + strconv.Itoa(frame.nextID)
+		frame.Vars[label] = &VariableReference{
+			Label: label,
+			Ref:   args[i],
+		}
+		p.VarRefs[i] = frame.Vars[label]
+	}
+	return p
 }
 
 func (p *Predicate) String() string {
@@ -190,14 +267,38 @@ func (a *Predicate) CanUnify(other Unifiable) bool {
 	// now unify each argument
 	for i, argA := range a.VarRefs {
 		argB := b.VarRefs[i]
+		//TODO: what if two arguments are the same variable?
+		// need to check that both other arguments can unify
+		// and vice-versa
 		if !argA.CanUnify(argB) {
 			return false
+		}
+		if argA.Dereference().Ref == nil && argB.Dereference().Ref != nil {
+			// now need to check if we have another unified argument
+			for j := i + 1; j < len(a.VarRefs); j++ {
+				if a.VarRefs[j].Label == argA.Label {
+					// ensure the other's arguments can unify
+					if !argB.CanUnify(b.VarRefs[j]) {
+						return false
+					}
+				}
+			}
+		} else if argA.Dereference().Ref != nil && argB.Dereference().Ref == nil {
+			// now need to check if we have another unified argument
+			for j := i + 1; j < len(a.VarRefs); j++ {
+				if b.VarRefs[j].Label == argB.Label {
+					// ensure this can unify with the other argument too
+					if !argA.CanUnify(b.VarRefs[j]) {
+						return false
+					}
+				}
+			}
 		}
 	}
 	return true
 }
 
-func (a *Predicate) CloneWithVars(vars map[string]*VariableReference) *Predicate {
+func (a *Predicate) CloneInFrame(frame *Frame) *Predicate {
 	p := &Predicate{
 		Definition: a.Definition,
 		VarRefs:    make([]*VariableReference, len(a.VarRefs)),
@@ -207,7 +308,7 @@ func (a *Predicate) CloneWithVars(vars map[string]*VariableReference) *Predicate
 		d := varRef.Dereference()
 		if p2, ok := d.Ref.(*Predicate); ok {
 			// find the variable references for this predicate too
-			p2 = p2.CloneWithVars(vars)
+			p2 = p2.CloneInFrame(frame)
 			// and make a new reference to it, not shared.
 			p.VarRefs[i] = &VariableReference{
 				Label: varRef.Label,
@@ -215,7 +316,13 @@ func (a *Predicate) CloneWithVars(vars map[string]*VariableReference) *Predicate
 			}
 			continue
 		}
-		p.VarRefs[i] = vars[varRef.Label]
+		if vr, ok := frame.Vars[varRef.Label]; ok {
+			p.VarRefs[i] = vr
+		} else {
+			panic("variable reference not found in frame " + varRef.String())
+			//vars[varRef.Label] = varRef.Clone().(*VariableReference)
+			//p.VarRefs[i] = vars[varRef.Label]
+		}
 	}
 	return p
 }
@@ -253,9 +360,13 @@ func (a *Predicate) Clone() Unifiable {
 		}
 		p.VarRefs[i] = newVars[v.Label]
 	}
+	frame := &Frame{
+		Vars:   newVars,
+		nextID: 0,
+	}
 	// clone the predicates
 	for i, vr := range needPredicates {
-		vr.Ref = origPredicates[i].CloneWithVars(newVars)
+		vr.Ref = origPredicates[i].CloneInFrame(frame)
 	}
 	return p
 }

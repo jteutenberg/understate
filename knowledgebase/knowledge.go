@@ -68,7 +68,7 @@ func (kb *KnowledgeBase) SetTrue(p *core.Predicate) {
 
 func (kb *KnowledgeBase) Exists(p *core.Predicate) bool {
 	halt := make(chan bool)
-	answer := kb.Answer(p, halt)
+	answer := kb.Answer(p, core.NewFrame(), halt)
 	ans := <-answer
 	close(halt)
 	if ans == nil || ans == core.Terminate {
@@ -77,7 +77,7 @@ func (kb *KnowledgeBase) Exists(p *core.Predicate) bool {
 	return true
 }
 
-func (kb *KnowledgeBase) Answer(p *core.Predicate, halt <-chan bool) <-chan *core.Predicate {
+func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, halt <-chan bool) <-chan *core.Predicate {
 	answers := make(chan *core.Predicate)
 	go func() {
 		if p.Definition == Not {
@@ -96,7 +96,7 @@ func (kb *KnowledgeBase) Answer(p *core.Predicate, halt <-chan bool) <-chan *cor
 			a := p.VarRefs[0]
 			b := p.VarRefs[1]
 			if a.CanUnify(b) {
-				cp := p.Clone().(*core.Predicate)
+				cp := p.CloneInFrame(frame)
 				cp.VarRefs[0].Unify(cp.VarRefs[1])
 				answers <- cp
 				// nothing else should do stuff with Eq predicates
@@ -112,7 +112,7 @@ func (kb *KnowledgeBase) Answer(p *core.Predicate, halt <-chan bool) <-chan *cor
 	loopAnswerers:
 		for _, answerer := range kb.answerers {
 			subHalt := make(chan bool)
-			subAnswer := answerer.Answer(p, subHalt)
+			subAnswer := answerer.Answer(p, frame, subHalt)
 			for {
 				select {
 				case <-halt:

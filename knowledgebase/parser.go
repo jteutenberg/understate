@@ -8,7 +8,7 @@ import (
 	"github.com/jteutenberg/understate/state"
 )
 
-func (kb *KnowledgeBase) ParseArguments(s string, typeHints []*core.Type) ([]core.Unifiable, error) {
+func (kb *KnowledgeBase) ParseArguments(s string, typeHints []*core.Type, frame *core.Frame) ([]core.Unifiable, error) {
 	args := make([]core.Unifiable, 0, 5)
 	nextTypeHint := 0
 	for i := 0; i < len(s); {
@@ -17,7 +17,7 @@ func (kb *KnowledgeBase) ParseArguments(s string, typeHints []*core.Type) ([]cor
 			typeHint = typeHints[nextTypeHint]
 			nextTypeHint++
 		}
-		c, next, err := kb.ParseClause(s[i:], typeHint)
+		c, next, err := kb.ParseClause(s[i:], typeHint, frame)
 		if err != nil {
 			return nil, err
 		}
@@ -30,7 +30,7 @@ func (kb *KnowledgeBase) ParseArguments(s string, typeHints []*core.Type) ([]cor
 	return args, nil
 }
 
-func (kb *KnowledgeBase) ParsePredicate(functor, arguments string) (*core.Predicate, error) {
+func (kb *KnowledgeBase) ParsePredicate(functor, arguments string, frame *core.Frame) (*core.Predicate, error) {
 	pdef, ok := kb.predicateDefinitions[functor]
 	if !ok {
 		//TODO: create a new predicate definition, nil typeHints
@@ -41,7 +41,7 @@ func (kb *KnowledgeBase) ParsePredicate(functor, arguments string) (*core.Predic
 	for i, argDef := range pdef.ArgDefinitions {
 		typeHints[i] = argDef.Type
 	}
-	args, err := kb.ParseArguments(arguments, typeHints)
+	args, err := kb.ParseArguments(arguments, typeHints, frame)
 	if err != nil {
 		return nil, err
 	}
@@ -50,35 +50,19 @@ func (kb *KnowledgeBase) ParsePredicate(functor, arguments string) (*core.Predic
 	}
 	// TODO: if any argDef has nil type in a new predicate definition, then
 	// try inferring from the arguments, e.g. atomic types or predicate definitions
-	vrefs := make([]*core.VariableReference, len(args))
+	labels := make([]string, len(args))
 	for i, argDef := range pdef.ArgDefinitions {
-		vrefs[i] = &core.VariableReference{
-			Label: "",
-			Ref:   nil,
-		}
 		if atomic, ok := args[i].(*core.Atomic); ok {
 			if argDef.Type == nil {
 				argDef.Type = atomic.Type
 			}
-			vrefs[i].Label = argDef.Label
-			vrefs[i].Ref = atomic
-		} else if predicate, ok := args[i].(*core.Predicate); ok {
-			vrefs[i].Label = argDef.Label
-			vrefs[i].Ref = predicate
-		} else if variable, ok := args[i].(*core.VariableReference); ok {
-			vrefs[i] = variable
-		} else {
-			return nil, fmt.Errorf("expected atomic, predicate, or variable reference, got %T", args[i])
 		}
+		labels[i] = argDef.Label
 	}
-	return &core.Predicate{
-		Definition: pdef,
-		VarRefs:    vrefs,
-	}, nil
-
+	return core.NewPredicate(pdef, labels, args, frame), nil
 }
 
-func (kb *KnowledgeBase) ParseClause(s string, typeHint *core.Type) (core.Unifiable, int, error) {
+func (kb *KnowledgeBase) ParseClause(s string, typeHint *core.Type, frame *core.Frame) (core.Unifiable, int, error) {
 	// consume the lead string up to the first '('',', ')', or end of string
 	for i := 0; i < len(s); i++ {
 		if s[i] == '(' {
@@ -97,7 +81,7 @@ func (kb *KnowledgeBase) ParseClause(s string, typeHint *core.Type) (core.Unifia
 			if count != 0 {
 				return nil, 0, fmt.Errorf("missing close parenthesis")
 			}
-			predicate, err := kb.ParsePredicate(functor, s[i+1:j-1])
+			predicate, err := kb.ParsePredicate(functor, s[i+1:j-1], frame)
 			if err != nil {
 				return nil, 0, err
 			}
@@ -123,11 +107,14 @@ func (kb *KnowledgeBase) ParseClause(s string, typeHint *core.Type) (core.Unifia
 				// numeric
 				return kb.State.GetAtomic(s[:i], state.Numeric), j, nil
 			} else {
-				// variable
-				return &core.VariableReference{
-					Label: s[:i],
-					Ref:   nil,
-				}, j, nil
+				label := s[:i]
+				if frame.Vars[label] == nil {
+					frame.Vars[label] = &core.VariableReference{
+						Label: label,
+						Ref:   nil,
+					}
+				}
+				return frame.Vars[label], j, nil
 			}
 		}
 	}
@@ -135,12 +122,13 @@ func (kb *KnowledgeBase) ParseClause(s string, typeHint *core.Type) (core.Unifia
 }
 
 func (kb *KnowledgeBase) ParseRule(s string) (*rules.Rule, error) {
+	frame := core.NewFrame()
 	// consume the lead string up to the first ':-'
 	for i := 0; i < len(s)-1; i++ {
 		if s[i] == ':' && s[i+1] == '-' {
 			// this is a rule. Parse its lhs and rhs
 			var lhs *core.Predicate
-			if lhsClause, _, err := kb.ParseClause(s[:i], nil); err != nil {
+			if lhsClause, _, err := kb.ParseClause(s[:i], nil, frame); err != nil {
 				return nil, err
 			} else {
 				lhs = lhsClause.(*core.Predicate)
@@ -158,7 +146,7 @@ func (kb *KnowledgeBase) ParseRule(s string) (*rules.Rule, error) {
 			}
 			// then parse multiple comma delimited predicates
 			rhs := make([]*core.Predicate, 0, 5)
-			args, err := kb.ParseArguments(s[i:end], nil)
+			args, err := kb.ParseArguments(s[i:end], nil, frame)
 			if err != nil {
 				return nil, err
 			}
@@ -169,7 +157,7 @@ func (kb *KnowledgeBase) ParseRule(s string) (*rules.Rule, error) {
 					return nil, fmt.Errorf("Expected predicate in rule's number %d RHS, got %T", i, arg)
 				}
 			}
-			return rules.NewRule(lhs, rhs), nil
+			return rules.NewRule(lhs, rhs, frame), nil
 		}
 	}
 	return nil, fmt.Errorf("invalid rule: %s", s)
