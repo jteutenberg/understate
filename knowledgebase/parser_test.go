@@ -170,7 +170,8 @@ func TestPreparedExamplesHaltEarly(t *testing.T) {
 func doPreparedExamples(t *testing.T, haltEarly bool) {
 	kb, rules := relationsKnowledgeBase()
 	//file, err := os.Open("../tests/input1.txt")
-	file, err := os.Open("../tests/input4.txt")
+	file, err := os.Open("../tests/input2a.txt")
+	//file, err := os.Open("../tests/input4.txt")
 	//kb, rules := linesKnowledgeBase()
 	//file, err := os.Open("../tests/input3.txt")
 	if err != nil {

@@ -53,6 +53,9 @@ func NewFrame() *Frame {
 
 // Clone a frame, including all predicates and atomics bound to variables
 func (frame *Frame) Clone() *Frame {
+	if frame == nil {
+		return NewFrame()
+	}
 	newSharedVars := make(map[string]*VariableReference)
 	for label, varRef := range frame.Vars {
 		// dereference everything
@@ -74,6 +77,9 @@ func (frame *Frame) Clone() *Frame {
 		} else {
 			// clone the unbound variable
 			newSharedVars[label] = vr.Clone().(*VariableReference)
+			if vr != varRef {
+				newSharedVars[varRef.Label] = newSharedVars[label]
+			}
 		}
 	}
 	return &Frame{
@@ -318,10 +324,14 @@ func (a *Predicate) CloneInFrame(frame *Frame) *Predicate {
 		}
 		if vr, ok := frame.Vars[varRef.Label]; ok {
 			p.VarRefs[i] = vr
+		} else if d.Ref != nil {
+			// not a predicate. So probably an atomic.
+			p.VarRefs[i] = &VariableReference{
+				Label: varRef.Label,
+				Ref:   d.Ref.Clone(),
+			}
 		} else {
-			panic("variable reference not found in frame " + varRef.String())
-			//vars[varRef.Label] = varRef.Clone().(*VariableReference)
-			//p.VarRefs[i] = vars[varRef.Label]
+			panic("variable reference not found in frame " + varRef.Label + " " + varRef.String())
 		}
 	}
 	return p
