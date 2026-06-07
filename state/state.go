@@ -1,6 +1,7 @@
 package state
 
 import (
+	"context"
 	"strconv"
 
 	"github.com/jteutenberg/bitset-go"
@@ -37,7 +38,7 @@ func NewState() *State {
 	}
 }
 
-func (s *State) Answer(p *core.Predicate, frame *core.Frame, halt <-chan bool) <-chan *core.Predicate {
+func (s *State) Answer(p *core.Predicate, frame *core.Frame, ctx context.Context) <-chan *core.Predicate {
 	trueFacts := s.TrueFacts[p.Definition.Functor]
 	falseFacts := s.FalseFacts[p.Definition.Functor]
 	answers := make(chan *core.Predicate)
@@ -62,7 +63,7 @@ func (s *State) Answer(p *core.Predicate, frame *core.Frame, halt <-chan bool) <
 				}
 				//if halt has been closed, end now
 				select {
-				case <-halt:
+				case <-ctx.Done():
 					goto done
 				default:
 					// continue
@@ -79,18 +80,14 @@ func (s *State) String() string {
 	return "A state"
 }
 
-func (s *State) GetNumericAtomic(index int) *core.Atomic {
-	if index < 0 {
-		return nil
-	}
-
-	if s.numericAtomics[index] == nil || index >= len(s.numericAtomics) {
+func (s *State) GetNumericAtomic(index uint) *core.Atomic {
+	if s.numericAtomics[index] == nil || index >= uint(len(s.numericAtomics)) {
 		a := &core.Atomic{
 			Index: index,
-			Value: strconv.Itoa(index),
+			Value: strconv.Itoa(int(index)),
 			Type:  Numeric,
 		}
-		if index < len(s.numericAtomics) {
+		if index < uint(len(s.numericAtomics)) {
 			s.numericAtomics[index] = a
 		} else {
 			s.numericAtomics = append(s.numericAtomics, a)
@@ -110,7 +107,7 @@ func (s *State) GetAtomic(name string, t *core.Type) *core.Atomic {
 		if err != nil || atomicIndex < 0 {
 			return nil
 		}
-		return s.GetNumericAtomic(atomicIndex)
+		return s.GetNumericAtomic(uint(atomicIndex))
 	}
 	//handle non-numeric atomics
 	atomicIndex := uint(0)
@@ -127,7 +124,7 @@ func (s *State) GetAtomic(name string, t *core.Type) *core.Atomic {
 		atomicIndex += 1
 	}
 	atomic := &core.Atomic{
-		Index: int(atomicIndex),
+		Index: atomicIndex,
 		Value: name,
 		Type:  t,
 	}

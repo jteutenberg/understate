@@ -1,6 +1,7 @@
 package state
 
 import (
+	"context"
 	"testing"
 
 	"github.com/jteutenberg/bitset-go"
@@ -24,19 +25,19 @@ func setupTest() (map[string]*core.Type, map[string]*core.PredicateDefinition, m
 	predDefs := make(map[string]*core.PredicateDefinition)
 	types["Plant"] = &core.Type{
 		Name:    "Plant",
-		Atomics: bitset.NewIntSetFromInts([]int{grass.Index, apple.Index}),
+		Atomics: bitset.NewIntSetFromUInts([]uint{grass.Index, apple.Index}),
 	}
 	types["Food"] = &core.Type{
 		Name:    "Food",
-		Atomics: bitset.NewIntSetFromInts([]int{grass.Index, apple.Index, beef.Index}),
+		Atomics: bitset.NewIntSetFromUInts([]uint{grass.Index, apple.Index, beef.Index}),
 	}
 	types["Creature"] = &core.Type{
 		Name:    "Creature",
-		Atomics: bitset.NewIntSetFromInts([]int{cow.Index, dog.Index}),
+		Atomics: bitset.NewIntSetFromUInts([]uint{cow.Index, dog.Index}),
 	}
 	types["Everything"] = &core.Type{
 		Name:    "Everything",
-		Atomics: bitset.NewIntSetFromInts([]int{cow.Index, dog.Index, grass.Index, apple.Index, beef.Index}),
+		Atomics: bitset.NewIntSetFromUInts([]uint{cow.Index, dog.Index, grass.Index, apple.Index, beef.Index}),
 	}
 	// true fact: cow eats grass
 	predDefs["eat"] = &core.PredicateDefinition{
@@ -104,7 +105,7 @@ func TestStateAnswerQuery(t *testing.T) {
 			{Label: "Y", Ref: nil},
 		},
 	}
-	answer := state.Answer(query, frame, make(chan bool))
+	answer := state.Answer(query, frame, context.Background())
 	ansCount := 0
 	for ans := range answer {
 		ansCount++
@@ -132,7 +133,7 @@ func TestStateAnswerQueryPermutations(t *testing.T) {
 			{Label: "Y", Ref: nil},
 		},
 	}
-	answer := state.Answer(query, frame, make(chan bool))
+	answer := state.Answer(query, frame, context.Background())
 	ansCount := 0
 	for ans := range answer {
 		ansCount++
@@ -160,7 +161,7 @@ func TestStateAnswerQueryFact(t *testing.T) {
 			{Label: "Y", Ref: atomics["grass"]},
 		},
 	}
-	answer := state.Answer(query, frame, make(chan bool))
+	answer := state.Answer(query, frame, context.Background())
 	ansCount := 0
 	for ans := range answer {
 		ansCount++

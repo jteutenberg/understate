@@ -1,6 +1,8 @@
 package knowledgebase
 
 import (
+	"context"
+
 	"github.com/jteutenberg/understate/core"
 	"github.com/jteutenberg/understate/state"
 )
@@ -67,17 +69,17 @@ func (kb *KnowledgeBase) SetTrue(p *core.Predicate) {
 }
 
 func (kb *KnowledgeBase) Exists(p *core.Predicate) bool {
-	halt := make(chan bool)
-	answer := kb.Answer(p, core.NewFrame(), halt)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	answer := kb.Answer(p, core.NewFrame(), ctx)
 	ans := <-answer
-	close(halt)
 	if ans == nil || ans == core.Terminate {
 		return false
 	}
 	return true
 }
 
-func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, halt <-chan bool) <-chan *core.Predicate {
+func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, ctx context.Context) <-chan *core.Predicate {
 	answers := make(chan *core.Predicate)
 	go func() {
 		if p.Definition == Not {
@@ -111,23 +113,20 @@ func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, halt <-cha
 		}
 	loopAnswerers:
 		for _, answerer := range kb.answerers {
-			subHalt := make(chan bool)
-			subAnswer := answerer.Answer(p, frame, subHalt)
+			// TODO: is a new context needed here?
+			subAnswer := answerer.Answer(p, frame, ctx)
 			for {
 				select {
-				case <-halt:
-					close(subHalt)
+				case <-ctx.Done():
 					close(answers)
 					return
 				case ans := <-subAnswer:
 					if ans == nil {
 						// end of answers for this answerer
-						close(subHalt)
 						continue loopAnswerers
 					}
 					answers <- ans
 					if ans == core.Terminate {
-						close(subHalt)
 						close(answers)
 						return
 					}

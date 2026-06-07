@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
@@ -84,7 +85,7 @@ func (rm *RuleMachine) AddRule(rule *Rule) {
 	rm.rules = append(rm.rules, rule)
 }
 
-func (rm *RuleMachine) Answer(p *core.Predicate, frame *core.Frame, halt <-chan bool) <-chan *core.Predicate {
+func (rm *RuleMachine) Answer(p *core.Predicate, frame *core.Frame, ctx context.Context) <-chan *core.Predicate {
 	answers := make(chan *core.Predicate)
 	go func() {
 	loopRules:
@@ -99,9 +100,9 @@ func (rm *RuleMachine) Answer(p *core.Predicate, frame *core.Frame, halt <-chan 
 					fmt.Printf("error unifying rule %v with %v: %v", rule.lhs, p, err)
 					continue
 				}
-				rm.checkAnswers(unified, answers, halt)
+				rm.checkAnswers(unified, answers, ctx)
 				select {
-				case <-halt:
+				case <-ctx.Done():
 					break loopRules
 				default:
 					// continue
@@ -117,28 +118,21 @@ func (rm *RuleMachine) String() string {
 	return "A rule machine"
 }
 
-func (rm *RuleMachine) checkAnswers(rule *Rule, answers chan<- *core.Predicate, halt <-chan bool) {
-	haltStack := make([]chan bool, 0, len(rule.rhs))
-	haltStack = append(haltStack, make(chan bool))
+func (rm *RuleMachine) checkAnswers(rule *Rule, answers chan<- *core.Predicate, ctx context.Context) {
 	stack := make([]<-chan *core.Predicate, 0, len(rule.rhs))
-	//b ecause we are passing the frame, do we need to clone the rule?
+	// because we are passing the frame, do we need to clone the rule?
 	// No. It was cloned just before calling
-	stack = append(stack, rm.subAnswerer.Answer(rule.rhs[0], rule.frame, haltStack[0]))
+	stack = append(stack, rm.subAnswerer.Answer(rule.rhs[0], rule.frame, ctx))
 	ruleStack := make([]*Rule, 0, len(rule.rhs))
 	ruleStack = append(ruleStack, rule)
 	for {
 		select {
-		case <-halt:
-			// terminate all sub-answerers
-			for _, halt := range haltStack {
-				close(halt)
-			}
+		case <-ctx.Done():
 			return
 		default:
 			// continue
 		}
 		ans := <-stack[len(stack)-1]
-		//fmt.Println("Answer at depth", len(stack), "is", ans)
 		if ans == core.Terminate || ans == nil {
 			// no more answers
 			stack = stack[:len(stack)-1]
@@ -147,18 +141,12 @@ func (rm *RuleMachine) checkAnswers(rule *Rule, answers chan<- *core.Predicate, 
 				return
 			}
 			ruleStack = ruleStack[:len(ruleStack)-1]
-			haltStack = haltStack[:len(haltStack)-1]
 			// backtrack to the previous RHS version
-			//fmt.Println("Backtrack to previous rule", len(stack))
 			continue
 		}
 		// so now we need to unify this answer with the current rule, and continue
-
 		// NOTE: if the next rule is a fact already, we can skip over the cloning bit
 		// as there is no need to unify the arguments
-
-		// unify returned atomics
-		//fmt.Println("Working on answers for", nextRHS[len(stack)-1])
 		if !ruleStack[len(stack)-1].rhs[len(stack)-1].CanUnify(ans) {
 			continue
 		}
@@ -169,9 +157,7 @@ func (rm *RuleMachine) checkAnswers(rule *Rule, answers chan<- *core.Predicate, 
 			answers <- nextRule.lhs
 		} else {
 			// recurse
-			//fmt.Println("Move down to next rule", len(stack))
-			haltStack = append(haltStack, make(chan bool))
-			stack = append(stack, rm.subAnswerer.Answer(nextRule.rhs[len(stack)], nextRule.frame, haltStack[len(haltStack)-1]))
+			stack = append(stack, rm.subAnswerer.Answer(nextRule.rhs[len(stack)], nextRule.frame, ctx))
 			ruleStack = append(ruleStack, nextRule)
 		}
 	}

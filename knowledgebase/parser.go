@@ -2,11 +2,70 @@ package knowledgebase
 
 import (
 	"fmt"
+	"io"
 
+	"github.com/jteutenberg/understate/actions"
 	"github.com/jteutenberg/understate/core"
 	"github.com/jteutenberg/understate/rules"
 	"github.com/jteutenberg/understate/state"
 )
+
+type ParseResult struct {
+	Predicates []*core.Predicate
+	Rule       *rules.Rule
+	Action     *actions.Action
+	isQuery    bool
+}
+
+func (kb *KnowledgeBase) Parse(reader io.ByteReader) <-chan ParseResult {
+	result := make(chan ParseResult)
+	go func() {
+		line := make([]byte, 0, 1000)
+		for {
+			// consume until a . or ?
+			isQuery := false
+			isRule := false
+			prev := byte(' ')
+			for {
+				if b, err := reader.ReadByte(); err != nil {
+					return
+				} else {
+					if b == ' ' || b == '\t' || b == '\n' || b == '\r' {
+						continue
+					}
+					if b == '.' {
+						break
+					}
+					if b == '?' {
+						isQuery = true
+						break
+					}
+					if prev == ':' && b == '-' {
+						isRule = true
+					}
+
+					line = append(line, b)
+					prev = b
+				}
+			}
+			s := string(line)
+			// did we see a rule's ":-"?
+			if isRule {
+				if isQuery {
+					// Error. Rule definitions should not be queries
+				}
+				if r, err := kb.ParseRule(s); err == nil {
+					result <- ParseResult{Rule: r, isQuery: false}
+				}
+			}
+			// somehow check if this is an action definition
+			//result <- ParseResult{Predicates: make([]*core.Predicate, 0, 5), isQuery: isQuery}
+
+			// anything else is a set of Predicates with a shared Frame
+		}
+	}()
+	return result
+}
 
 func (kb *KnowledgeBase) ParseArguments(s string, typeHints []*core.Type, frame *core.Frame) ([]core.Unifiable, error) {
 	args := make([]core.Unifiable, 0, 5)

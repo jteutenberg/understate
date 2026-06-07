@@ -7,7 +7,7 @@ import (
 )
 
 type Atomic struct {
-	Index int
+	Index uint
 	Value string
 	Type  *Type
 }

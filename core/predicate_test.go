@@ -11,11 +11,11 @@ func TestSimpleUnify(t *testing.T) {
 	grass := Atomic{Index: 2, Value: "grass"}
 	plantType := Type{
 		Name:    "Plant",
-		Atomics: bitset.NewIntSetFromInts([]int{grass.Index}),
+		Atomics: bitset.NewIntSetFromUInts([]uint{grass.Index}),
 	}
 	herbivoreType := Type{
 		Name:    "Herbivore",
-		Atomics: bitset.NewIntSetFromInts([]int{cow.Index}),
+		Atomics: bitset.NewIntSetFromUInts([]uint{cow.Index}),
 	}
 	def := &PredicateDefinition{
 		Functor: "eat",

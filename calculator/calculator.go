@@ -1,6 +1,8 @@
 package calculator
 
 import (
+	"context"
+
 	"github.com/jteutenberg/understate/core"
 	"github.com/jteutenberg/understate/state"
 )
@@ -41,7 +43,7 @@ func (calc *Calculator) GetAtomicValue(p *core.Predicate, arg int) *core.Atomic 
 	return nil
 }
 
-func (calc *Calculator) Answer(p *core.Predicate, frame *core.Frame, halt <-chan bool) <-chan *core.Predicate {
+func (calc *Calculator) Answer(p *core.Predicate, frame *core.Frame, ctx context.Context) <-chan *core.Predicate {
 	answer := make(chan *core.Predicate)
 	go func() {
 		switch p.Definition.Functor {
@@ -72,10 +74,10 @@ func (calc *Calculator) Answer(p *core.Predicate, frame *core.Frame, halt <-chan
 				} else {
 					// only v2 is not nil, need to iterate over v1, v3 combinations
 					for i := 0; ; i++ {
-						v1 = calc.state.GetNumericAtomic(i)
-						v3 = calc.state.GetNumericAtomic(i + v2.Index)
+						v1 = calc.state.GetNumericAtomic(uint(i))
+						v3 = calc.state.GetNumericAtomic(uint(i) + v2.Index)
 						// ensure v1, v3 are not equal. Need a CanUnify check otherwise
-						if i == i+v2.Index || p.VarRefs[0].Label != p.VarRefs[2].Label {
+						if uint(i) == uint(i)+v2.Index || p.VarRefs[0].Label != p.VarRefs[2].Label {
 							answer <- &core.Predicate{
 								Definition: p.Definition,
 								VarRefs: []*core.VariableReference{
@@ -86,7 +88,7 @@ func (calc *Calculator) Answer(p *core.Predicate, frame *core.Frame, halt <-chan
 							}
 						}
 						select {
-						case <-halt:
+						case <-ctx.Done():
 							goto done
 						default:
 							// continue
@@ -99,10 +101,10 @@ func (calc *Calculator) Answer(p *core.Predicate, frame *core.Frame, halt <-chan
 				} else {
 					// need to iterate over v2, v3 combinations
 					for i := 0; ; i++ {
-						v2 = calc.state.GetNumericAtomic(i)
-						v3 = calc.state.GetNumericAtomic(i + v1.Index)
+						v2 = calc.state.GetNumericAtomic(uint(i))
+						v3 = calc.state.GetNumericAtomic(uint(i) + v1.Index)
 						// ensure v2, v3 are not equal. Need a CanUnify check otherwise
-						if i == i+v1.Index || p.VarRefs[1].Label != p.VarRefs[2].Label {
+						if uint(i) == uint(i)+v1.Index || p.VarRefs[1].Label != p.VarRefs[2].Label {
 							answer <- &core.Predicate{
 								Definition: p.Definition,
 								VarRefs: []*core.VariableReference{
@@ -113,7 +115,7 @@ func (calc *Calculator) Answer(p *core.Predicate, frame *core.Frame, halt <-chan
 							}
 						}
 						select {
-						case <-halt:
+						case <-ctx.Done():
 							goto done
 						default:
 							// continue
@@ -123,7 +125,7 @@ func (calc *Calculator) Answer(p *core.Predicate, frame *core.Frame, halt <-chan
 			} else {
 				// v3 must not be nil
 				// need to iterate over v1, v2 combinations
-				for i := 0; i <= v3.Index; i++ {
+				for i := uint(0); i <= v3.Index; i++ {
 					v1 = calc.state.GetNumericAtomic(i)
 					v2 = calc.state.GetNumericAtomic(v3.Index - i)
 					// ensure v1, v2 are not equal. Need a CanUnify check otherwise
@@ -138,7 +140,7 @@ func (calc *Calculator) Answer(p *core.Predicate, frame *core.Frame, halt <-chan
 						}
 					}
 					select {
-					case <-halt:
+					case <-ctx.Done():
 						goto done
 					default:
 						// continue
@@ -172,7 +174,7 @@ func (calc *Calculator) Answer(p *core.Predicate, frame *core.Frame, halt <-chan
 							},
 						}
 						select {
-						case <-halt:
+						case <-ctx.Done():
 							goto done
 						default:
 							// continue
@@ -188,16 +190,16 @@ func (calc *Calculator) Answer(p *core.Predicate, frame *core.Frame, halt <-chan
 				}
 			} else {
 				if v2 == nil {
-					for i := 1; true; i++ {
+					for i := uint(1); true; i++ {
 						// send (1,0), (2, 0), (2, 1) ...
-						for j := 0; j < i; j++ {
+						for j := uint(0); j < i; j++ {
 							// answer (i, j)
 							answer <- &core.Predicate{Definition: p.Definition, VarRefs: []*core.VariableReference{
 								{Label: p.VarRefs[0].Label, Ref: calc.state.GetNumericAtomic(i)},
 								{Label: p.VarRefs[1].Label, Ref: calc.state.GetNumericAtomic(j)},
 							}}
 							select {
-							case <-halt:
+							case <-ctx.Done():
 								goto done
 							default:
 								// continue
@@ -217,7 +219,7 @@ func (calc *Calculator) Answer(p *core.Predicate, frame *core.Frame, halt <-chan
 							},
 						}
 						select {
-						case <-halt:
+						case <-ctx.Done():
 							goto done
 						default:
 							// continue

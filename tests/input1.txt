@@ -4,7 +4,7 @@ parent(sam, sal).
 parent(nina, jo).
 
 # sal, alex; jo, alex
-parent(X, alex)
+parent(X, alex)?
 
 # sam, sal; sam, alex
-parent(sam,Y)
+parent(sam,Y)?

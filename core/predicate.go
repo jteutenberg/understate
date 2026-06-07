@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 )
@@ -41,7 +42,7 @@ type Frame struct {
 }
 
 type Answerer interface {
-	Answer(p *Predicate, frame *Frame, halt <-chan bool) <-chan *Predicate
+	Answer(p *Predicate, frame *Frame, ctx context.Context) <-chan *Predicate
 }
 
 func NewFrame() *Frame {
@@ -379,4 +380,62 @@ func (a *Predicate) Clone() Unifiable {
 		vr.Ref = origPredicates[i].CloneInFrame(frame)
 	}
 	return p
+}
+
+func AnswerConjunction(answerer Answerer, queries []*Predicate, frame *Frame, ctx context.Context) <-chan []*Predicate {
+	answers := make(chan []*Predicate, 2)
+	go func() {
+		stack := make([]<-chan *Predicate, 0, len(queries))
+		frameStack := make([]*Frame, 0, len(queries))
+		partialAnswers := make([][]*Predicate, 0, len(queries))
+		fr := frame.Clone()
+		frameStack = append(frameStack, fr)
+		partialAnswers = append(partialAnswers, []*Predicate{queries[0].CloneInFrame(fr)})
+		stack = append(stack, answerer.Answer(partialAnswers[0][0], frameStack[0], ctx))
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				// continue
+			}
+			ans := <-stack[len(stack)-1]
+			if ans == Terminate || ans == nil {
+				// no more answers
+				stack = stack[:len(stack)-1]
+				if len(stack) == 0 {
+					// we're done
+					close(answers)
+					return
+				}
+				// backtrack to the previous query
+				continue
+			}
+			// so now we need to unify this answer with the current query, and continue
+			// NOTE: if the next query is a fact already, we can skip over the cloning bit
+			// as there is no need to unify the arguments
+			if !partialAnswers[len(stack)-1][len(stack)-1].CanUnify(ans) {
+				continue
+			}
+			// clone the partial answer and unify with the latest result
+			nextFrame := frameStack[len(stack)-1].Clone()
+			nextPartialAnswer := make([]*Predicate, len(stack)+1)
+			for i, p := range partialAnswers[len(stack)-1] {
+				nextPartialAnswer[i] = p.CloneInFrame(nextFrame)
+			}
+			// unify with the latest result and store
+			nextPartialAnswer[len(stack)-1].Unify(ans)
+			if len(stack) == len(queries) {
+				answers <- nextPartialAnswer[:len(stack)]
+			} else {
+				// recurse
+				// add the last query to the partial answer
+				nextPartialAnswer[len(stack)] = queries[len(stack)].CloneInFrame(nextFrame)
+				partialAnswers = append(partialAnswers, nextPartialAnswer)
+				frameStack = append(frameStack, nextFrame)
+				stack = append(stack, answerer.Answer(nextPartialAnswer[len(stack)], nextFrame, ctx))
+			}
+		}
+	}()
+	return answers
 }
