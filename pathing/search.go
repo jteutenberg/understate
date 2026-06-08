@@ -2,7 +2,6 @@ package pathing
 
 import (
 	"container/heap"
-	"context"
 
 	"github.com/jteutenberg/bitset-go"
 	"github.com/jteutenberg/understate/core"
@@ -64,7 +63,7 @@ func (search *Search) ShortestPath(start *core.Atomic, end *core.Atomic, connect
 		return nil
 	}
 
-	ctx := context.Background()
+	ctx := core.NewQueryContext()
 
 	open := priorityQueue(make([]*searchNode, 0, 100))
 

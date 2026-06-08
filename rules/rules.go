@@ -1,7 +1,6 @@
 package rules
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 
@@ -85,7 +84,7 @@ func (rm *RuleMachine) AddRule(rule *Rule) {
 	rm.rules = append(rm.rules, rule)
 }
 
-func (rm *RuleMachine) Answer(p *core.Predicate, frame *core.Frame, ctx context.Context) <-chan *core.Predicate {
+func (rm *RuleMachine) Answer(p *core.Predicate, frame *core.Frame, ctx core.QueryContext) <-chan *core.Predicate {
 	answers := make(chan *core.Predicate)
 	go func() {
 	loopRules:
@@ -118,7 +117,7 @@ func (rm *RuleMachine) String() string {
 	return "A rule machine"
 }
 
-func (rm *RuleMachine) checkAnswers(rule *Rule, answers chan<- *core.Predicate, ctx context.Context) {
+func (rm *RuleMachine) checkAnswers(rule *Rule, answers chan<- *core.Predicate, ctx core.QueryContext) {
 	stack := make([]<-chan *core.Predicate, 0, len(rule.rhs))
 	// because we are passing the frame, do we need to clone the rule?
 	// No. It was cloned just before calling

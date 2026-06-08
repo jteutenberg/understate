@@ -2,7 +2,6 @@ package knowledgebase_test
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -170,9 +169,10 @@ func TestPreparedExamplesHaltEarly(t *testing.T) {
 
 func doPreparedExamples(t *testing.T, haltEarly bool) {
 	kb, rules := relationsKnowledgeBase()
-	file, err := os.Open("../tests/input1.txt")
+	//file, err := os.Open("../tests/input1.txt")
+	//file, err := os.Open("../tests/input2.txt")
 	//file, err := os.Open("../tests/input2a.txt")
-	//file, err := os.Open("../tests/input4.txt")
+	file, err := os.Open("../tests/input4.txt")
 	//kb, rules := linesKnowledgeBase()
 	//file, err := os.Open("../tests/input3.txt")
 	if err != nil {
@@ -217,8 +217,8 @@ func doPreparedExamples(t *testing.T, haltEarly bool) {
 					kb.SetTrue(p)
 				} else {
 					doHalt := haltEarly
-					ctx, cancel := context.WithCancel(context.Background())
-					defer cancel()
+					ctx := core.NewQueryContext()
+					defer ctx.Cancel()
 					answers := kb.Answer(p, frame, ctx)
 					answered := false
 					for ans := range answers {
@@ -246,7 +246,7 @@ func doPreparedExamples(t *testing.T, haltEarly bool) {
 						}
 						if doHalt {
 							fmt.Println("Halting early")
-							cancel()
+							ctx.Cancel()
 							doHalt = false
 						}
 					}

@@ -1,7 +1,7 @@
 package knowledgebase
 
 import (
-	"context"
+	"strconv"
 
 	"github.com/jteutenberg/understate/core"
 	"github.com/jteutenberg/understate/state"
@@ -69,8 +69,8 @@ func (kb *KnowledgeBase) SetTrue(p *core.Predicate) {
 }
 
 func (kb *KnowledgeBase) Exists(p *core.Predicate) bool {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := core.NewQueryContext()
+	defer ctx.Cancel()
 	answer := kb.Answer(p, core.NewFrame(), ctx)
 	ans := <-answer
 	if ans == nil || ans == core.Terminate {
@@ -79,8 +79,33 @@ func (kb *KnowledgeBase) Exists(p *core.Predicate) bool {
 	return true
 }
 
-func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, ctx context.Context) <-chan *core.Predicate {
+func (kb *KnowledgeBase) argsKey(p *core.Predicate, mask []bool) string {
+	s := ""
+	for i, arg := range p.VarRefs {
+		if !mask[i] {
+			continue
+		}
+		a := arg.Dereference().Ref.(*core.Atomic)
+		s += strconv.Itoa(int(a.Index))
+		s += ","
+	}
+	return s
+}
+
+func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, ctx core.QueryContext) <-chan *core.Predicate {
 	answers := make(chan *core.Predicate)
+	// ensure we are using a SearchContext
+	var searchCtx *SearchContext
+	if sCtx, ok := ctx.(*SearchContext); ok {
+		searchCtx = sCtx
+	} else {
+		searchCtx = NewSearchContext(ctx)
+	}
+	if searchCtx.depth > 100 {
+		close(answers)
+		return answers
+	}
+
 	go func() {
 		if p.Definition == Not {
 			subP := (p.VarRefs[0].Dereference().Ref).(*core.Predicate)
@@ -111,13 +136,21 @@ func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, ctx contex
 				return
 			}
 		}
+		sent := map[string]bool{}
+		searchCtx.depth++
+		mask := make([]bool, len(p.VarRefs))
+		for i := range mask {
+			// ignore variables labelled with leading underscore
+			mask[i] = p.VarRefs[i].Label[0] == '_'
+		}
 	loopAnswerers:
 		for _, answerer := range kb.answerers {
-			// TODO: is a new context needed here?
-			subAnswer := answerer.Answer(p, frame, ctx)
+			subAnswer := answerer.Answer(p, frame, searchCtx)
+
 			for {
 				select {
-				case <-ctx.Done():
+				case <-searchCtx.Done():
+					searchCtx.depth--
 					close(answers)
 					return
 				case ans := <-subAnswer:
@@ -125,14 +158,21 @@ func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, ctx contex
 						// end of answers for this answerer
 						continue loopAnswerers
 					}
+					argsKey := kb.argsKey(ans, mask)
+					if sent[argsKey] {
+						continue
+					}
+					sent[argsKey] = true
 					answers <- ans
 					if ans == core.Terminate {
+						searchCtx.depth--
 						close(answers)
 						return
 					}
 				}
 			}
 		}
+		searchCtx.depth--
 		close(answers)
 	}()
 	return answers

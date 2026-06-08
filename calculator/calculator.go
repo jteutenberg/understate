@@ -1,8 +1,6 @@
 package calculator
 
 import (
-	"context"
-
 	"github.com/jteutenberg/understate/core"
 	"github.com/jteutenberg/understate/state"
 )
@@ -43,7 +41,7 @@ func (calc *Calculator) GetAtomicValue(p *core.Predicate, arg int) *core.Atomic 
 	return nil
 }
 
-func (calc *Calculator) Answer(p *core.Predicate, frame *core.Frame, ctx context.Context) <-chan *core.Predicate {
+func (calc *Calculator) Answer(p *core.Predicate, frame *core.Frame, ctx core.QueryContext) <-chan *core.Predicate {
 	answer := make(chan *core.Predicate)
 	go func() {
 		switch p.Definition.Functor {
@@ -164,13 +162,13 @@ func (calc *Calculator) Answer(p *core.Predicate, frame *core.Frame, ctx context
 			v2 := calc.GetAtomicValue(p, 1)
 			if v1 != nil {
 				if v2 == nil {
-					for i := v1.Index - 1; i >= 0; i-- {
+					for i := int(v1.Index) - 1; i >= 0; i-- {
 						//(v1, i)
 						answer <- &core.Predicate{
 							Definition: p.Definition,
 							VarRefs: []*core.VariableReference{
 								{Label: p.VarRefs[0].Label, Ref: v1},
-								{Label: p.VarRefs[1].Label, Ref: calc.state.GetNumericAtomic(i)},
+								{Label: p.VarRefs[1].Label, Ref: calc.state.GetNumericAtomic(uint(i))},
 							},
 						}
 						select {

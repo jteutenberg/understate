@@ -1,7 +1,6 @@
 package core
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 )
@@ -41,8 +40,18 @@ type Frame struct {
 	nextID int
 }
 
+type QueryContext interface {
+	Done() <-chan struct{}
+	Cancel()
+}
+
+type qContext struct {
+	done      chan struct{}
+	cancelled bool
+}
+
 type Answerer interface {
-	Answer(p *Predicate, frame *Frame, ctx context.Context) <-chan *Predicate
+	Answer(p *Predicate, frame *Frame, ctx QueryContext) <-chan *Predicate
 }
 
 func NewFrame() *Frame {
@@ -89,6 +98,24 @@ func (frame *Frame) Clone() *Frame {
 	}
 }
 
+func NewQueryContext() QueryContext {
+	return &qContext{
+		done:      make(chan struct{}),
+		cancelled: false,
+	}
+}
+
+func (ctx *qContext) Done() <-chan struct{} {
+	return ctx.done
+}
+
+func (ctx *qContext) Cancel() {
+	if !ctx.cancelled {
+		ctx.cancelled = true
+		close(ctx.done)
+	}
+}
+
 // Create a new Predicate, constructing VariableReferences and updating the frame as required
 func NewPredicate(definition *PredicateDefinition, labels []string, args []Unifiable, frame *Frame) *Predicate {
 	p := &Predicate{
@@ -104,6 +131,7 @@ func NewPredicate(definition *PredicateDefinition, labels []string, args []Unifi
 				continue
 			} else if varRef.Ref == nil {
 				// if it is truly variable, store using its label
+				//TODO: handle underscore "ignore" variables
 				frame.Vars[varRef.Label] = varRef
 				p.VarRefs[i] = frame.Vars[varRef.Label]
 				continue
@@ -112,7 +140,7 @@ func NewPredicate(definition *PredicateDefinition, labels []string, args []Unifi
 		// an atomic or predicate, possibly pointed to by a variable reference
 		// ensure a new unique label is used
 		frame.nextID++
-		label = "_?" + strconv.Itoa(frame.nextID)
+		label = "?" + strconv.Itoa(frame.nextID)
 		frame.Vars[label] = &VariableReference{
 			Label: label,
 			Ref:   args[i],
@@ -382,7 +410,7 @@ func (a *Predicate) Clone() Unifiable {
 	return p
 }
 
-func AnswerConjunction(answerer Answerer, queries []*Predicate, frame *Frame, ctx context.Context) <-chan []*Predicate {
+func AnswerConjunction(answerer Answerer, queries []*Predicate, frame *Frame, ctx QueryContext) <-chan []*Predicate {
 	answers := make(chan []*Predicate, 2)
 	go func() {
 		stack := make([]<-chan *Predicate, 0, len(queries))

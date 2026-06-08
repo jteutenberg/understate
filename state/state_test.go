@@ -1,7 +1,6 @@
 package state
 
 import (
-	"context"
 	"testing"
 
 	"github.com/jteutenberg/bitset-go"
@@ -105,7 +104,7 @@ func TestStateAnswerQuery(t *testing.T) {
 			{Label: "Y", Ref: nil},
 		},
 	}
-	answer := state.Answer(query, frame, context.Background())
+	answer := state.Answer(query, frame, core.NewQueryContext())
 	ansCount := 0
 	for ans := range answer {
 		ansCount++
@@ -133,7 +132,7 @@ func TestStateAnswerQueryPermutations(t *testing.T) {
 			{Label: "Y", Ref: nil},
 		},
 	}
-	answer := state.Answer(query, frame, context.Background())
+	answer := state.Answer(query, frame, core.NewQueryContext())
 	ansCount := 0
 	for ans := range answer {
 		ansCount++
@@ -161,7 +160,7 @@ func TestStateAnswerQueryFact(t *testing.T) {
 			{Label: "Y", Ref: atomics["grass"]},
 		},
 	}
-	answer := state.Answer(query, frame, context.Background())
+	answer := state.Answer(query, frame, core.NewQueryContext())
 	ansCount := 0
 	for ans := range answer {
 		ansCount++
