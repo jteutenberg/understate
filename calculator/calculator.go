@@ -33,6 +33,10 @@ func NewCalculator(state *state.State) *Calculator {
 	}
 }
 
+func (calc *Calculator) GetName() string {
+	return "Calculator"
+}
+
 func (calc *Calculator) GetAtomicValue(p *core.Predicate, arg int) *core.Atomic {
 	a := p.GetArgument(arg)
 	if atomic, ok := a.(*core.Atomic); ok {

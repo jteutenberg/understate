@@ -2,6 +2,7 @@ package knowledgebase
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/jteutenberg/understate/core"
 	"github.com/jteutenberg/understate/state"
@@ -80,20 +81,24 @@ func (kb *KnowledgeBase) Exists(p *core.Predicate) bool {
 }
 
 func (kb *KnowledgeBase) argsKey(p *core.Predicate, mask []bool) string {
-	s := ""
+	var sb strings.Builder
 	for i, arg := range p.VarRefs {
-		if !mask[i] {
+		if mask[i] {
 			continue
 		}
 		a := arg.Dereference().Ref.(*core.Atomic)
-		s += strconv.Itoa(int(a.Index))
-		s += ","
+		sb.WriteString(strconv.Itoa(int(a.Index)))
+		sb.WriteString(",")
 	}
-	return s
+	return sb.String()
+}
+
+func (kb *KnowledgeBase) GetName() string {
+	return "KnowledgeBase"
 }
 
 func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, ctx core.QueryContext) <-chan *core.Predicate {
-	answers := make(chan *core.Predicate)
+	answers := make(chan *core.Predicate, 1)
 	// ensure we are using a SearchContext
 	var searchCtx *SearchContext
 	if sCtx, ok := ctx.(*SearchContext); ok {

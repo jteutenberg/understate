@@ -26,7 +26,7 @@ type Unifiable interface {
 }
 
 type VariableReference struct {
-	Label string    // names like ?1 ?2
+	Label string    // names like &1 &2
 	Ref   Unifiable // *Atomic, *Predicate, *VariableReference, or nil
 }
 
@@ -52,6 +52,7 @@ type qContext struct {
 
 type Answerer interface {
 	Answer(p *Predicate, frame *Frame, ctx QueryContext) <-chan *Predicate
+	GetName() string
 }
 
 func NewFrame() *Frame {
@@ -140,7 +141,7 @@ func NewPredicate(definition *PredicateDefinition, labels []string, args []Unifi
 		// an atomic or predicate, possibly pointed to by a variable reference
 		// ensure a new unique label is used
 		frame.nextID++
-		label = "?" + strconv.Itoa(frame.nextID)
+		label = "&" + strconv.Itoa(frame.nextID)
 		frame.Vars[label] = &VariableReference{
 			Label: label,
 			Ref:   args[i],

@@ -84,6 +84,10 @@ func (rm *RuleMachine) AddRule(rule *Rule) {
 	rm.rules = append(rm.rules, rule)
 }
 
+func (rm *RuleMachine) GetName() string {
+	return "RuleMachine"
+}
+
 func (rm *RuleMachine) Answer(p *core.Predicate, frame *core.Frame, ctx core.QueryContext) <-chan *core.Predicate {
 	answers := make(chan *core.Predicate)
 	go func() {

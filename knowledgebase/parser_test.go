@@ -167,6 +167,54 @@ func TestPreparedExamplesHaltEarly(t *testing.T) {
 	doPreparedExamples(t, true)
 }
 
+func TestParseExamples(t *testing.T) {
+	doParseExamples(t)
+}
+
+func doParseExamples(t *testing.T) {
+	kb, rules := relationsKnowledgeBase()
+	file, err := os.Open("../tests/input1.txt")
+	if err != nil {
+		t.Fatalf("failed to open test input file: %v", err)
+	}
+	defer file.Close()
+	tokens := kb.SplitInput(bufio.NewReader(file))
+	for token := range tokens {
+		result := kb.Parse(token)
+		if result == nil {
+			continue
+		}
+		if result.Rule != nil {
+			fmt.Println("parsed rule")
+			rules.AddRule(result.Rule)
+		}
+		if result.Predicates != nil {
+			if result.IsQuery {
+				fmt.Println("Query: ")
+				for _, p := range result.Predicates {
+					fmt.Println(" - ", p.String())
+				}
+				if len(result.Predicates) == 1 {
+					// single query
+					answers := kb.Answer(result.Predicates[0], result.Frame, core.NewQueryContext())
+					for ans := range answers {
+						fmt.Println(" -> ", ans.String())
+					}
+					fmt.Println("Done.")
+				} else if len(result.Predicates) > 1 {
+					// conjunction
+				}
+			} else {
+				for i, p := range result.Predicates {
+					fmt.Printf("parsed fact %d: %s\n", i, p.String())
+					// TODO: handle not fact
+					kb.SetTrue(p)
+				}
+			}
+		}
+	}
+}
+
 func doPreparedExamples(t *testing.T, haltEarly bool) {
 	kb, rules := relationsKnowledgeBase()
 	//file, err := os.Open("../tests/input1.txt")

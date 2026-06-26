@@ -5,9 +5,9 @@ line(point(1,2), point(3,4)).
 line(point(1,4), point(1,2)).
 line(point(1,4), point(3,4)).
 
-line(point(1,X),point(3,Y))
+line(point(1,X),point(3,Y))?
 
-eq(point(1,A), point(B,4))
-eq(point(1,C), point(A,B))
-eq(point(1,A), point(B,B))
-eq(point(1,X), point(Y,4))
+eq(point(1,A), point(B,4))?
+eq(point(1,C), point(A,B))?
+eq(point(1,A), point(B,B))?
+eq(point(1,X), point(Y,4))?

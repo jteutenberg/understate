@@ -75,8 +75,20 @@ func (s *State) Answer(p *core.Predicate, frame *core.Frame, ctx core.QueryConte
 	return answers
 }
 
-func (s *State) String() string {
-	return "A state"
+func (s *State) GetName() string {
+	return "State"
+}
+
+func (s *State) GetType(name string) *core.Type {
+	if t := s.Types[name]; t != nil {
+		return t
+	}
+	t := &core.Type{
+		Name:    name,
+		Atomics: bitset.NewIntSet(),
+	}
+	s.Types[name] = t
+	return t
 }
 
 func (s *State) GetNumericAtomic(index uint) *core.Atomic {
@@ -111,10 +123,13 @@ func (s *State) GetAtomic(name string, t *core.Type) *core.Atomic {
 	//handle non-numeric atomics
 	atomicIndex := uint(0)
 	if t != nil {
+		// try the next index for this type
 		var ok bool
 		ok, atomicIndex = t.Atomics.GetLastValue()
 		atomicIndex++
+		// now check that it is unused in all atomics
 		if !ok || s.AllAtomics.Contains(atomicIndex) {
+			// not free. So use an new global atomic index
 			_, atomicIndex = s.AllAtomics.GetLastValue()
 			atomicIndex += 5
 		}
