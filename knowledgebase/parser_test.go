@@ -198,11 +198,18 @@ func doParseExamples(t *testing.T) {
 					// single query
 					answers := kb.Answer(result.Predicates[0], result.Frame, core.NewQueryContext())
 					for ans := range answers {
-						fmt.Println(" -> ", ans.String())
+						fmt.Println("  -> ", ans.String())
 					}
 					fmt.Println("Done.")
 				} else if len(result.Predicates) > 1 {
 					// conjunction
+					answers := core.AnswerConjunction(kb, result.Predicates, result.Frame, core.NewQueryContext())
+					for ans := range answers {
+						fmt.Println("  ->")
+						for _, p := range ans {
+							fmt.Println("    ", p.String())
+						}
+					}
 				}
 			} else {
 				for i, p := range result.Predicates {

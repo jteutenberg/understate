@@ -141,7 +141,11 @@ func NewPredicate(definition *PredicateDefinition, labels []string, args []Unifi
 		// an atomic or predicate, possibly pointed to by a variable reference
 		// ensure a new unique label is used
 		frame.nextID++
-		label = "&" + strconv.Itoa(frame.nextID)
+		if atom, ok := args[i].(*Atomic); ok {
+			label = atom.Value
+		} else {
+			label = "&" + strconv.Itoa(frame.nextID)
+		}
 		frame.Vars[label] = &VariableReference{
 			Label: label,
 			Ref:   args[i],
@@ -155,6 +159,18 @@ func (p *Predicate) String() string {
 	s := fmt.Sprintf("%s(", p.Definition.Functor)
 	for i, varRef := range p.VarRefs {
 		s += varRef.String()
+		if i < len(p.VarRefs)-1 {
+			s += ", "
+		}
+	}
+	s += ")"
+	return s
+}
+
+func (p *Predicate) StringVerbose() string {
+	s := fmt.Sprintf("%s(", p.Definition.Functor)
+	for i, varRef := range p.VarRefs {
+		s += varRef.StringVerbose()
 		if i < len(p.VarRefs)-1 {
 			s += ", "
 		}
@@ -352,14 +368,14 @@ func (a *Predicate) CloneInFrame(frame *Frame) *Predicate {
 			}
 			continue
 		}
-		if vr, ok := frame.Vars[varRef.Label]; ok {
-			p.VarRefs[i] = vr
-		} else if d.Ref != nil {
+		if d.Ref != nil {
 			// not a predicate. So probably an atomic.
 			p.VarRefs[i] = &VariableReference{
 				Label: varRef.Label,
 				Ref:   d.Ref.Clone(),
 			}
+		} else if vr, ok := frame.Vars[varRef.Label]; ok {
+			p.VarRefs[i] = vr
 		} else {
 			panic("variable reference not found in frame " + varRef.Label + " " + varRef.String())
 		}

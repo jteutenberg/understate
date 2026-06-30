@@ -8,3 +8,9 @@ parent(nina, jo).
 parent(X, alex)?
 
 parent(sam,Y)?
+
+parent(X, alex),
+parent(X, sal)?
+
+parent(X, alex),
+parent(X, jo)?
