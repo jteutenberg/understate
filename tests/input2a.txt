@@ -9,7 +9,7 @@ not(parent(jo, nina))?
 eq(nina, X)?
 eq(X, jo)?
 
-sibling(A, B) :- parent(X, A), parent(X, B), not(eq(A,B)).
-grandparent(A, B) :- parent(A, X), parent(X, B).
+sibling(A, B) ~ parent(X, A), parent(X, B), not(eq(A,B)).
+grandparent(A, B) ~ parent(A, X), parent(X, B).
 
 sibling(alex, X)?

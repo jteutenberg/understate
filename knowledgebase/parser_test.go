@@ -4,12 +4,12 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/jteutenberg/bitset-go"
 	"github.com/jteutenberg/understate/calculator"
 	"github.com/jteutenberg/understate/core"
+	"github.com/jteutenberg/understate/io"
 	"github.com/jteutenberg/understate/knowledgebase"
 	"github.com/jteutenberg/understate/rules"
 	"github.com/jteutenberg/understate/state"
@@ -160,154 +160,63 @@ func linesKnowledgeBase() (*knowledgebase.KnowledgeBase, *rules.RuleMachine) {
 	return kb, rules
 }
 
-func TestPreparedExamples(t *testing.T) {
-	doPreparedExamples(t, false)
+func TestParseExamples1(t *testing.T) {
+	doParseExamples("../tests/input1.txt", t)
 }
-func TestPreparedExamplesHaltEarly(t *testing.T) {
-	doPreparedExamples(t, true)
+func TestParseExamples2(t *testing.T) {
+	doParseExamples("../tests/input2.txt", t)
+	doParseExamples("../tests/input2a.txt", t)
+}
+func TestParseExamples3(t *testing.T) {
+	doParseExamples("../tests/input3.txt", t)
+}
+func TestParseExamples4(t *testing.T) {
+	doParseExamples("../tests/input4.txt", t)
+}
+func TestParseExamples5(t *testing.T) {
+	doParseExamples("../tests/input5.txt", t)
 }
 
-func TestParseExamples(t *testing.T) {
-	doParseExamples(t)
-}
-
-func doParseExamples(t *testing.T) {
-	kb, rules := relationsKnowledgeBase()
-	file, err := os.Open("../tests/input1.txt")
+func doParseExamples(filename string, t *testing.T) {
+	kb, _ := relationsKnowledgeBase()
+	file, err := os.Open(filename)
 	if err != nil {
 		t.Fatalf("failed to open test input file: %v", err)
 	}
 	defer file.Close()
-	tokens := kb.SplitInput(bufio.NewReader(file))
+	parser := io.NewPredicateReader([]byte{knowledgebase.ActionSeparator, knowledgebase.RuleSeparator},
+		[]byte{knowledgebase.AssertTerminator, knowledgebase.CommandTerminator, knowledgebase.QueryTerminator})
+	tokens := parser.Parse(bufio.NewReader(file))
+	queries := make(chan []*core.Predicate)
+
 	for token := range tokens {
-		result := kb.Parse(token)
-		if result == nil {
-			continue
+		query, _, frame, err := kb.Process(token, queries, nil)
+		if err != nil {
+			fmt.Println(err)
+			return
 		}
-		if result.Rule != nil {
-			fmt.Println("parsed rule")
-			rules.AddRule(result.Rule)
-		}
-		if result.Predicates != nil {
-			if result.IsQuery {
-				fmt.Println("Query: ")
-				for _, p := range result.Predicates {
-					fmt.Println(" - ", p.String())
+		if query != nil {
+			fmt.Println("Query: ")
+			for _, p := range query {
+				fmt.Println(" - ", p.String())
+			}
+			if len(query) == 1 {
+				// single query
+				answers := kb.Answer(query[0], frame, core.NewQueryContext())
+				for ans := range answers {
+					fmt.Println("  -> ", ans.String())
 				}
-				if len(result.Predicates) == 1 {
-					// single query
-					answers := kb.Answer(result.Predicates[0], result.Frame, core.NewQueryContext())
-					for ans := range answers {
-						fmt.Println("  -> ", ans.String())
-					}
-					fmt.Println("Done.")
-				} else if len(result.Predicates) > 1 {
-					// conjunction
-					answers := core.AnswerConjunction(kb, result.Predicates, result.Frame, core.NewQueryContext())
-					for ans := range answers {
-						fmt.Println("  ->")
-						for _, p := range ans {
-							fmt.Println("    ", p.String())
-						}
-					}
-				}
-			} else {
-				for i, p := range result.Predicates {
-					fmt.Printf("parsed fact %d: %s\n", i, p.String())
-					// TODO: handle not fact
-					kb.SetTrue(p)
-				}
-			}
-		}
-	}
-}
-
-func doPreparedExamples(t *testing.T, haltEarly bool) {
-	kb, rules := relationsKnowledgeBase()
-	//file, err := os.Open("../tests/input1.txt")
-	//file, err := os.Open("../tests/input2.txt")
-	//file, err := os.Open("../tests/input2a.txt")
-	file, err := os.Open("../tests/input4.txt")
-	//kb, rules := linesKnowledgeBase()
-	//file, err := os.Open("../tests/input3.txt")
-	if err != nil {
-		t.Fatalf("failed to open test input file: %v", err)
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	lineNum := 0
-	for scanner.Scan() {
-		line := scanner.Text()
-		if len(line) < 2 {
-			continue
-		}
-		if line[0] == '#' {
-			continue
-		}
-		isQuery := line[len(line)-1] == '?'
-		lineNum++
-		// if line contains ':-', then parse it as a rule
-		frame := core.NewFrame()
-		if strings.Contains(line, ":-") {
-			rule, err := kb.ParseRule(line)
-			if err != nil {
-				t.Errorf("error parsing rule line %d (%q): %v", lineNum, line, err)
-				continue
-			}
-			rules.AddRule(rule)
-		} else {
-			parsed, _, err := kb.ParseClause(line, nil, frame)
-			if err != nil {
-				t.Errorf("error parsing line %d (%q): %v", lineNum, line, err)
-				continue
-			}
-			if parsed == nil {
-				t.Errorf("line %d: parser returned nil for line: %q", lineNum, line)
-				continue
-			}
-			if p, ok := parsed.(*core.Predicate); ok {
-				fmt.Printf("parsed: %s is fact: %v\n", p.String(), p.IsFact())
-				if p.IsFact() && !isQuery {
-					kb.SetTrue(p)
-				} else {
-					doHalt := haltEarly
-					ctx := core.NewQueryContext()
-					defer ctx.Cancel()
-					answers := kb.Answer(p, frame, ctx)
-					answered := false
-					for ans := range answers {
-						if ans == nil || ans == core.Terminate {
-							if p.IsFact() {
-								if answered {
-									t.Logf("%s: True.", p.String())
-								} else {
-									t.Logf("%s: False.", p.String())
-								}
-							} else {
-								t.Logf("%s: Done.", p.String())
-							}
-							break
-						}
-						answered = true
-						if !p.IsFact() {
-							fmt.Printf("%s -> %v %v\n", p.String(), ans, p.CanUnify(ans))
-							f2 := frame.Clone()
-							p2 := p.CloneInFrame(f2)
-							uerr := p2.Unify(ans)
-							if uerr != nil {
-								fmt.Println("Error unifying: ", uerr)
-							}
-						}
-						if doHalt {
-							fmt.Println("Halting early")
-							ctx.Cancel()
-							doHalt = false
-						}
+				fmt.Println("Done.")
+			} else if len(query) > 1 {
+				// conjunction
+				answers := core.AnswerConjunction(kb, query, frame, core.NewQueryContext())
+				for ans := range answers {
+					fmt.Println("  ->")
+					for _, p := range ans {
+						fmt.Println("    ", p.String())
 					}
 				}
 			}
 		}
 	}
-
 }

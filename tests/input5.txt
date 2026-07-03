@@ -1,0 +1,23 @@
+:at(X:Thing, Y:Location).
+:adjacent(A:location, B:location).
+:connected(A:location, B:location).
+
+adjacent(A,B) ~ adjacent(B,A).
+
+adjacent(a, b),
+adjacent(b,c),
+adjacent(c,d),
+adjacent(d,e),
+adjacent(e,f),
+adjacent(f,a),
+adjacent(x,y).
+
+adjacent(y,x)?
+adjacent(y,a)?
+
+connected(X,Y) ~ adjacent(X,Y).
+connected(X,Y) ~ adjacent(X,A), connected(A,Y).
+
+connected(e,a)?
+connected(e,x)?
+

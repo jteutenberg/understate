@@ -80,17 +80,20 @@ func (kb *KnowledgeBase) Exists(p *core.Predicate) bool {
 	return true
 }
 
-func (kb *KnowledgeBase) argsKey(p *core.Predicate, mask []bool) string {
+func (kb *KnowledgeBase) argsKey(p *core.Predicate, mask []bool) (string, bool) {
 	var sb strings.Builder
 	for i, arg := range p.VarRefs {
 		if mask[i] {
 			continue
 		}
-		a := arg.Dereference().Ref.(*core.Atomic)
-		sb.WriteString(strconv.Itoa(int(a.Index)))
-		sb.WriteString(",")
+		if a, ok := arg.Dereference().Ref.(*core.Atomic); ok {
+			sb.WriteString(strconv.Itoa(int(a.Index)))
+			sb.WriteString(",")
+		} else {
+			return "", true
+		}
 	}
-	return sb.String()
+	return sb.String(), false
 }
 
 func (kb *KnowledgeBase) GetName() string {
@@ -163,13 +166,19 @@ func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, ctx core.Q
 						// end of answers for this answerer
 						continue loopAnswerers
 					}
-					argsKey := kb.argsKey(ans, mask)
-					if sent[argsKey] {
+					argsKey, pass := kb.argsKey(ans, mask)
+					if !pass && sent[argsKey] {
 						continue
 					}
 					sent[argsKey] = true
 					answers <- ans
 					if ans == core.Terminate {
+						searchCtx.depth--
+						close(answers)
+						return
+					}
+					if p.IsFact() {
+						// only one possible answer: a match
 						searchCtx.depth--
 						close(answers)
 						return

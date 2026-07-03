@@ -83,6 +83,9 @@ func (s *State) GetType(name string) *core.Type {
 	if t := s.Types[name]; t != nil {
 		return t
 	}
+	if name == "Numeric" {
+		return Numeric
+	}
 	t := &core.Type{
 		Name:    name,
 		Atomics: bitset.NewIntSet(),
