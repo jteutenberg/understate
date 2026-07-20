@@ -109,6 +109,14 @@ func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, ctx core.Q
 	} else {
 		searchCtx = NewSearchContext(ctx)
 	}
+	//fmt.Println("At depth", searchCtx.depth, "checking history for", p.String())
+	//for b, h := range searchCtx.history {
+	//	fmt.Println(" hist", b, h)
+	//}
+	if searchCtx.InHistory(p) {
+		close(answers)
+		return answers
+	}
 	if searchCtx.depth > 100 {
 		close(answers)
 		return answers
@@ -145,6 +153,7 @@ func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, ctx core.Q
 			}
 		}
 		sent := map[string]bool{}
+		searchCtx.AddHistory(p)
 		searchCtx.depth++
 		mask := make([]bool, len(p.VarRefs))
 		for i := range mask {
@@ -159,6 +168,7 @@ func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, ctx core.Q
 				select {
 				case <-searchCtx.Done():
 					searchCtx.depth--
+					searchCtx.PopHistory()
 					close(answers)
 					return
 				case ans := <-subAnswer:
@@ -174,12 +184,14 @@ func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, ctx core.Q
 					answers <- ans
 					if ans == core.Terminate {
 						searchCtx.depth--
+						searchCtx.PopHistory()
 						close(answers)
 						return
 					}
 					if p.IsFact() {
 						// only one possible answer: a match
 						searchCtx.depth--
+						searchCtx.PopHistory()
 						close(answers)
 						return
 					}
@@ -187,6 +199,7 @@ func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, ctx core.Q
 			}
 		}
 		searchCtx.depth--
+		searchCtx.PopHistory()
 		close(answers)
 	}()
 	return answers

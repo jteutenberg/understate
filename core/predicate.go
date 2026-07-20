@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 var Terminate = &Predicate{Definition: &PredicateDefinition{Functor: "Terminate"}}
@@ -168,15 +169,48 @@ func (p *Predicate) String() string {
 }
 
 func (p *Predicate) StringVerbose() string {
-	s := fmt.Sprintf("%s(", p.Definition.Functor)
+	sb := strings.Builder{}
+	sb.WriteString(p.Definition.Functor)
+	sb.WriteString("(")
 	for i, varRef := range p.VarRefs {
-		s += varRef.StringVerbose()
+		sb.WriteString(varRef.StringVerbose())
 		if i < len(p.VarRefs)-1 {
-			s += ", "
+			sb.WriteString(", ")
 		}
 	}
-	s += ")"
-	return s
+	sb.WriteString(")")
+	return sb.String()
+}
+
+func (p *Predicate) CanonicalArgsString(varCount int) string {
+	sb := strings.Builder{}
+	first := true
+	for _, varRef := range p.VarRefs {
+		if first {
+			first = false
+		} else {
+			sb.WriteString(",")
+		}
+		vr := varRef.Dereference()
+		if vr.Ref == nil {
+			sb.WriteString("_")
+			sb.WriteString(strconv.Itoa(varCount))
+			varCount++
+		} else if at, ok := vr.Ref.(*Atomic); ok {
+			if len(at.Value) < 3 {
+				sb.WriteString(at.Value)
+			} else {
+				sb.WriteString("_")
+				sb.WriteString(strconv.Itoa(int(at.Index)))
+			}
+		} else if p, ok := vr.Ref.(*Predicate); ok {
+			sb.WriteString(p.Definition.Functor)
+			sb.WriteString("(")
+			sb.WriteString(p.CanonicalArgsString(varCount))
+			sb.WriteString(")")
+		}
+	}
+	return sb.String()
 }
 
 func (p *Predicate) IsFact() bool {
