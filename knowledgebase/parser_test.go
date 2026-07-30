@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/jteutenberg/bitset-go"
+	"github.com/jteutenberg/understate/actions"
 	"github.com/jteutenberg/understate/calculator"
 	"github.com/jteutenberg/understate/core"
 	"github.com/jteutenberg/understate/io"
@@ -176,9 +177,13 @@ func TestParseExamples4(t *testing.T) {
 func TestParseExamples5(t *testing.T) {
 	doParseExamples("../tests/input5.txt", t)
 }
+func TestParseExamples6(t *testing.T) {
+	doParseExamples("../tests/input6.txt", t)
+}
 
 func doParseExamples(filename string, t *testing.T) {
 	kb, _ := relationsKnowledgeBase()
+	actionSet := actions.NewActionSet()
 	file, err := os.Open(filename)
 	if err != nil {
 		t.Fatalf("failed to open test input file: %v", err)
@@ -187,10 +192,8 @@ func doParseExamples(filename string, t *testing.T) {
 	parser := io.NewPredicateReader([]byte{knowledgebase.ActionSeparator, knowledgebase.RuleSeparator},
 		[]byte{knowledgebase.AssertTerminator, knowledgebase.CommandTerminator, knowledgebase.QueryTerminator})
 	tokens := parser.Parse(bufio.NewReader(file))
-	queries := make(chan []*core.Predicate)
-
 	for token := range tokens {
-		query, _, frame, err := kb.Process(token, queries, nil)
+		query, command, actionDefinition, frame, err := kb.Process(token)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -201,12 +204,17 @@ func doParseExamples(filename string, t *testing.T) {
 				fmt.Println(" - ", p.String())
 			}
 			if len(query) == 1 {
-				// single query
-				answers := kb.Answer(query[0], frame, core.NewQueryContext())
-				for ans := range answers {
-					fmt.Println("  -> ", ans.String())
+				if act := actionSet.GetAction(query[0]); act != nil {
+					fmt.Println("Action query: ", act.Signature.String())
+					fmt.Println(" Applicable: ", act.IsApplicable(kb))
+				} else {
+					// single query
+					answers := kb.Answer(query[0], frame, core.NewQueryContext())
+					for ans := range answers {
+						fmt.Println("  -> ", ans.String())
+					}
+					fmt.Println("Done.")
 				}
-				fmt.Println("Done.")
 			} else if len(query) > 1 {
 				// conjunction
 				answers := core.AnswerConjunction(kb, query, frame, core.NewQueryContext())
@@ -217,6 +225,25 @@ func doParseExamples(filename string, t *testing.T) {
 					}
 				}
 			}
+		}
+		if actionDefinition != nil {
+			fmt.Println("Action definition: ", actionDefinition.Signature.String())
+			actionSet.AddAction(actionDefinition)
+		}
+		if command != nil {
+			fmt.Println("Command: ", command.String())
+			act := actionSet.GetAction(command)
+			if act == nil {
+				fmt.Println("Action not found")
+				continue
+			}
+			fmt.Println("Action: ", act.Signature.String())
+			if act.IsApplicable(kb) {
+				fmt.Println("Action is applicable")
+			} else {
+				fmt.Println("Action is not applicable")
+			}
+			act.ApplyTo(kb.State)
 		}
 	}
 }

@@ -8,6 +8,8 @@ import (
 	"github.com/jteutenberg/understate/state"
 )
 
+// Holds when its argument does not unify with any true facts.
+// Answers are always the argument itself.
 var Not = &core.PredicateDefinition{
 	Functor: "not",
 	ArgDefinitions: []core.ArgumentDefinition{
@@ -55,6 +57,20 @@ func NewKnowledgeBase() *KnowledgeBase {
 
 func (kb *KnowledgeBase) AddPredicateDefinition(pdef *core.PredicateDefinition) {
 	kb.predicateDefinitions[pdef.Functor] = pdef
+	for _, argDef := range pdef.ArgDefinitions {
+		if argDef.Type != nil && kb.predicateDefinitions[argDef.Type.Name] == nil {
+			typePredicate := &core.PredicateDefinition{
+				Functor: argDef.Type.Name,
+				ArgDefinitions: []core.ArgumentDefinition{
+					{
+						Label: "X",
+						Type:  nil,
+					},
+				},
+			}
+			kb.predicateDefinitions[argDef.Type.Name] = typePredicate
+		}
+	}
 }
 
 func (kb *KnowledgeBase) AddAtomic(name string, t *core.Type) {
@@ -69,9 +85,7 @@ func (kb *KnowledgeBase) SetTrue(p *core.Predicate) {
 	kb.State.SetTrue(p)
 }
 
-func (kb *KnowledgeBase) Exists(p *core.Predicate) bool {
-	ctx := core.NewQueryContext()
-	defer ctx.Cancel()
+func (kb *KnowledgeBase) Exists(p *core.Predicate, ctx core.QueryContext) bool {
 	answer := kb.Answer(p, core.NewFrame(), ctx)
 	ans := <-answer
 	if ans == nil || ans == core.Terminate {
@@ -125,7 +139,7 @@ func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, ctx core.Q
 	go func() {
 		if p.Definition == Not {
 			subP := (p.VarRefs[0].Dereference().Ref).(*core.Predicate)
-			if kb.Exists(subP) {
+			if kb.Exists(subP, searchCtx) {
 				answers <- core.Terminate
 				close(answers)
 				return
@@ -160,6 +174,7 @@ func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, ctx core.Q
 			// ignore variables labelled with leading underscore
 			mask[i] = p.VarRefs[i].Label[0] == '_'
 		}
+		//fmt.Println("Increased context depth to", searchCtx.depth, len(searchCtx.history))
 	loopAnswerers:
 		for _, answerer := range kb.answerers {
 			subAnswer := answerer.Answer(p, frame, searchCtx)
@@ -198,6 +213,7 @@ func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, ctx core.Q
 				}
 			}
 		}
+		//fmt.Println("Decreased context depth from", searchCtx.depth, len(searchCtx.history))
 		searchCtx.depth--
 		searchCtx.PopHistory()
 		close(answers)

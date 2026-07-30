@@ -19,9 +19,10 @@ type State struct {
 	TrueFacts  map[string][]*core.Predicate
 	FalseFacts map[string][]*core.Predicate
 
-	AllAtomics    *bitset.IntSet
-	atomicsByName map[string]*core.Atomic
-	Types         map[string]*core.Type
+	AllAtomics     *bitset.IntSet
+	atomicsByName  map[string]*core.Atomic
+	atomicsByIndex map[uint]*core.Atomic
+	Types          map[string]*core.Type
 
 	numericAtomics []*core.Atomic
 }
@@ -32,6 +33,7 @@ func NewState() *State {
 		FalseFacts:     make(map[string][]*core.Predicate),
 		AllAtomics:     bitset.NewIntSet(),
 		atomicsByName:  make(map[string]*core.Atomic),
+		atomicsByIndex: make(map[uint]*core.Atomic),
 		Types:          make(map[string]*core.Type),
 		numericAtomics: make([]*core.Atomic, 1000000),
 	}
@@ -67,6 +69,35 @@ func (s *State) Answer(p *core.Predicate, frame *core.Frame, ctx core.QueryConte
 				default:
 					// continue
 				}
+			}
+		}
+		// check for types
+		if pType, ok := s.Types[p.Definition.Functor]; ok && pType != nil {
+			// this must have a single argument, and either be a variable or atomic
+			if len(p.VarRefs) != 1 {
+				panic("Type predicate has multiple arguments: " + p.String())
+			}
+			arg := p.VarRefs[0].Dereference()
+			if arg.Ref == nil {
+				// if this has a variable argument, generate all valid atomics for this type
+				for ok, aIndex := pType.Atomics.GetFirstValue(); ok; ok, aIndex = pType.Atomics.GetNextValue(aIndex) {
+					np := p.Clone().(*core.Predicate)
+					np.VarRefs[0].Ref = s.atomicsByIndex[aIndex]
+					answers <- np
+					select {
+					case <-ctx.Done():
+						goto done
+					default:
+						// continue
+					}
+				}
+				answers <- core.Terminate
+				goto done
+			}
+			if _, ok := arg.Ref.(*core.Atomic); ok {
+				answers <- p
+				answers <- core.Terminate
+				goto done
 			}
 		}
 	done:
@@ -147,6 +178,7 @@ func (s *State) GetAtomic(name string, t *core.Type) *core.Atomic {
 	}
 	s.AllAtomics.Add(atomicIndex)
 	s.atomicsByName[name] = atomic
+	s.atomicsByIndex[atomicIndex] = atomic
 	if t != nil {
 		t.Atomics.Add(atomicIndex)
 	}
@@ -154,16 +186,21 @@ func (s *State) GetAtomic(name string, t *core.Type) *core.Atomic {
 }
 
 func (s *State) SetTrue(p *core.Predicate) {
-	// TODO: assert that the predicate is a fact
+	if !p.IsFact() {
+		panic("predicate is not a fact: " + p.String())
+	}
 	if s.TrueFacts[p.Definition.Functor] == nil {
 		s.TrueFacts[p.Definition.Functor] = make([]*core.Predicate, 0)
 	}
 	//TODO: just return if the predicate is already in the list
 	s.TrueFacts[p.Definition.Functor] = append(s.TrueFacts[p.Definition.Functor], p)
+	//TODO: remove from false facts, if it exists
 }
 
 func (s *State) SetFalse(p *core.Predicate) {
-	// TODO: assert that the predicate is a fact
+	if !p.IsFact() {
+		panic("predicate is not a fact: " + p.String())
+	}
 	if s.FalseFacts[p.Definition.Functor] == nil {
 		s.FalseFacts[p.Definition.Functor] = make([]*core.Predicate, 0)
 	}

@@ -462,6 +462,44 @@ func (a *Predicate) Clone() Unifiable {
 }
 
 func AnswerConjunction(answerer Answerer, queries []*Predicate, frame *Frame, ctx QueryContext) <-chan []*Predicate {
+	// need to scan for any not() predicates. Then if there are any variables that are not present
+	addTypeQueries := make(map[int]*Predicate)
+	seenArgs := make(map[string]bool)
+	for i, query := range queries {
+		if query.Definition.Functor == "not" {
+			notQuery := query.GetArgument(0).(*Predicate)
+			for j, varRef := range notQuery.VarRefs {
+				vr := varRef.Dereference()
+				if vr.Ref == nil && !seenArgs[vr.Label] {
+					// possibly need to add a dummy type qurey for this. Add just before this query
+					seenArgs[vr.Label] = true
+					queryType := notQuery.Definition.ArgDefinitions[j].Type
+					def := &PredicateDefinition{Functor: queryType.Name, ArgDefinitions: []ArgumentDefinition{{Type: queryType}}}
+					addTypeQueries[i] = NewPredicate(def, []string{vr.Label}, []Unifiable{&VariableReference{Label: vr.Label, Ref: nil}}, frame)
+					continue
+				}
+			}
+		} else {
+			// add variable names to seen args
+			for _, varRef := range query.VarRefs {
+				vr := varRef.Dereference()
+				if vr.Ref == nil {
+					seenArgs[vr.Label] = true
+				}
+			}
+		}
+	}
+	// now update query to add any required type predicates
+	if len(addTypeQueries) > 0 {
+		newQueries := make([]*Predicate, 0, len(queries)+len(addTypeQueries))
+		for i, query := range queries {
+			if typeQuery, ok := addTypeQueries[i]; ok {
+				newQueries = append(newQueries, typeQuery)
+			}
+			newQueries = append(newQueries, query)
+		}
+		queries = newQueries
+	}
 	answers := make(chan []*Predicate, 2)
 	go func() {
 		stack := make([]<-chan *Predicate, 0, len(queries))

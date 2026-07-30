@@ -3,6 +3,7 @@ package knowledgebase
 import (
 	"fmt"
 
+	"github.com/jteutenberg/understate/actions"
 	"github.com/jteutenberg/understate/core"
 	"github.com/jteutenberg/understate/io"
 	"github.com/jteutenberg/understate/rules"
@@ -24,18 +25,18 @@ type ParsedPredicates struct {
 	IsCommand  bool
 }
 
-func (kb *KnowledgeBase) Process(input io.ParseResult, queriesOut chan<- []*core.Predicate, actionsOut chan<- []*core.Predicate) (query []*core.Predicate, action *core.Predicate, frame *core.Frame, err error) {
+func (kb *KnowledgeBase) Process(input io.ParseResult) (query []*core.Predicate, action *core.Predicate, actionDefinition *actions.Action, frame *core.Frame, err error) {
 	frame = core.NewFrame()
 	// check for a definition override (for predicate definitions only)
 	isDefinition := input.Predicates[0][0] == ':'
 	if isDefinition {
 		if input.Terminator != AssertTerminator {
-			return nil, nil, nil, fmt.Errorf("Error. Definitions should terminate as a fact")
+			return nil, nil, nil, nil, fmt.Errorf("Error. Definitions should terminate as a fact")
 		}
 		// Definitions!
 		input.Predicates[0] = input.Predicates[0][1:]
 		if len(input.Separators) > 0 {
-			return nil, nil, nil, fmt.Errorf("Error. Definitions should not include separators")
+			return nil, nil, nil, nil, fmt.Errorf("Error. Definitions should not include separators")
 		}
 		// add predicate definitions
 		for _, s := range input.Predicates {
@@ -44,10 +45,10 @@ func (kb *KnowledgeBase) Process(input io.ParseResult, queriesOut chan<- []*core
 				// :eat(Herbivore, Plant)
 				kb.AddPredicateDefinition(pdef)
 			} else {
-				return nil, nil, nil, fmt.Errorf("Error parsing definition: %v", err)
+				return nil, nil, nil, nil, fmt.Errorf("Error parsing definition: %v", err)
 			}
 		}
-		return nil, nil, nil, nil
+		return nil, nil, nil, nil, nil
 	}
 
 	// everything else is a list of predicate sets
@@ -56,36 +57,43 @@ func (kb *KnowledgeBase) Process(input io.ParseResult, queriesOut chan<- []*core
 		if sps, err := kb.ParsePredicates(s, frame); err == nil {
 			ps[i] = sps
 		} else {
-			return nil, nil, nil, fmt.Errorf("Error. Unable to parse predicates: %v", err)
+			return nil, nil, nil, nil, fmt.Errorf("Error. Unable to parse predicates: %v", err)
 		}
 	}
 	// check for a rule (definition)
 	if len(input.Separators) >= 1 && input.Separators[0] == RuleSeparator {
 		if len(ps) != 2 {
-			return nil, nil, nil, fmt.Errorf("Error. Rule should have a LHS and RHS set of predicates")
+			return nil, nil, nil, nil, fmt.Errorf("Error. Rule should have a LHS and RHS set of predicates")
 		}
 		if len(ps[0]) != 1 {
-			return nil, nil, nil, fmt.Errorf("Error. LHS of rule must have only one predicate.")
+			return nil, nil, nil, nil, fmt.Errorf("Error. LHS of rule must have only one predicate.")
 		}
 		rule := rules.NewRule(ps[0][0], ps[1], frame)
 		// add the rule to the knowledge base's tule machine
 		for _, answerer := range kb.answerers {
 			if ruler, ok := answerer.(*rules.RuleMachine); ok {
 				ruler.AddRule(rule)
-				return nil, nil, nil, nil
+				return nil, nil, nil, nil, nil
 			}
 		}
-		return nil, nil, nil, fmt.Errorf("Error. No rule machine found to add rule")
+		return nil, nil, nil, nil, fmt.Errorf("Error. No rule machine found to add rule")
+	} else if len(input.Separators) >= 1 && input.Separators[0] == ActionSeparator {
+		if len(ps) != 3 || len(ps[0]) != 1 {
+			return nil, nil, nil, nil, fmt.Errorf("Error. Action should have a signature, preconditions, and effects")
+		}
+		// yield the action definition
+		act := actions.NewAction(ps[0][0], ps[1], ps[2], frame)
+		return nil, nil, act, nil, nil
 	} else if input.Terminator == QueryTerminator {
 		if len(input.Separators) > 0 {
-			return nil, nil, nil, fmt.Errorf("Error. Queries should not include separators")
+			return nil, nil, nil, nil, fmt.Errorf("Error. Queries should not include separators")
 		}
 		// we now get list of predicates (potentially an action's predicate)
-		//TODO: check for an action name?
-		return ps[0], nil, frame, nil
+		//don't check for an action name as it is handled outside the knowledge base
+		return ps[0], nil, nil, frame, nil
 	} else if input.Terminator == AssertTerminator {
 		if len(input.Separators) > 0 {
-			return nil, nil, nil, fmt.Errorf("Error. Assertions should not include separators")
+			return nil, nil, nil, nil, fmt.Errorf("Error. Assertions should not include separators")
 		}
 		// typically a single ground fact
 		for _, nps := range ps {
@@ -93,12 +101,14 @@ func (kb *KnowledgeBase) Process(input io.ParseResult, queriesOut chan<- []*core
 				kb.SetTrue(p)
 			}
 		}
-		return nil, nil, nil, nil
+		return nil, nil, nil, nil, nil
 	} else if input.Terminator == CommandTerminator {
-		// an action
-		// looks like a predicate but won't have a definition
+		// an action or other command to be handled outside the knowledge base
+		// TODO: actually, parsing the action will result in a predicate definition for its signature
+		// check there is exactly one predicate
+		return nil, ps[0][0], nil, nil, nil
 	}
-	return nil, nil, nil, fmt.Errorf("Unkown input type")
+	return nil, nil, nil, nil, fmt.Errorf("Unkown input type")
 }
 
 func (kb *KnowledgeBase) ParseArguments(s string, typeHints []*core.Type, frame *core.Frame) ([]core.Unifiable, error) {
@@ -307,46 +317,3 @@ func (kb *KnowledgeBase) ParsePredicates(s string, frame *core.Frame) ([]*core.P
 	}
 	return ps, nil
 }
-
-/*
-func (kb *KnowledgeBase) ParseRule(s string) (*rules.Rule, error) {
-	frame := core.NewFrame()
-	// consume the lead string up to the first ':-'
-	for i := 0; i < len(s)-1; i++ {
-		if s[i] == ':' && s[i+1] == '-' {
-			// this is a rule. Parse its lhs and rhs
-			var lhs *core.Predicate
-			if lhsClause, _, err := kb.ParseClause(s[:i], nil, frame); err != nil {
-				return nil, err
-			} else {
-				lhs = lhsClause.(*core.Predicate)
-			}
-			i += 2
-			for i < len(s) && s[i] == ' ' {
-				i++
-			}
-			if i >= len(s) {
-				return nil, fmt.Errorf("expected rule RHS, got %q", s[i:])
-			}
-			end := i + 1
-			for end < len(s) && s[end] != '.' {
-				end++
-			}
-			// then parse multiple comma delimited predicates
-			rhs := make([]*core.Predicate, 0, 5)
-			args, err := kb.ParseArguments(s[i:end], nil, frame)
-			if err != nil {
-				return nil, err
-			}
-			for i, arg := range args {
-				if predicate, ok := arg.(*core.Predicate); ok {
-					rhs = append(rhs, predicate)
-				} else {
-					return nil, fmt.Errorf("Expected predicate in rule's number %d RHS, got %T", i, arg)
-				}
-			}
-			return rules.NewRule(lhs, rhs, frame), nil
-		}
-	}
-	return nil, fmt.Errorf("invalid rule: %s", s)
-}*/
