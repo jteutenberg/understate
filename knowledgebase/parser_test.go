@@ -12,6 +12,7 @@ import (
 	"github.com/jteutenberg/understate/core"
 	"github.com/jteutenberg/understate/io"
 	"github.com/jteutenberg/understate/knowledgebase"
+	"github.com/jteutenberg/understate/pathing"
 	"github.com/jteutenberg/understate/rules"
 	"github.com/jteutenberg/understate/state"
 )
@@ -183,7 +184,12 @@ func TestParseExamples6(t *testing.T) {
 
 func doParseExamples(filename string, t *testing.T) {
 	kb, _ := relationsKnowledgeBase()
+	// prepare for action
 	actionSet := actions.NewActionSet()
+	// include pathing
+	search := pathing.NewSearch(kb)
+	kb.AddPredicateDefinition(pathing.ShortestPathPredicate)
+
 	file, err := os.Open(filename)
 	if err != nil {
 		t.Fatalf("failed to open test input file: %v", err)
@@ -207,6 +213,22 @@ func doParseExamples(filename string, t *testing.T) {
 				if act := actionSet.GetAction(query[0]); act != nil {
 					fmt.Println("Action query: ", act.Signature.String())
 					fmt.Println(" Applicable: ", act.IsApplicable(kb))
+				} else if query[0].Definition == pathing.ShortestPathPredicate {
+					from := query[0].GetArgument(0).(*core.Atomic)
+					to := query[0].GetArgument(1).(*core.Atomic)
+					connector := query[0].GetArgument(2).(*core.Predicate).Definition
+					path := search.ShortestPath(from, to, connector)
+					if path == nil {
+						fmt.Println("No path between", from.Value, "and", to.Value)
+					} else {
+						for i, v := range path {
+							if i > 0 {
+								fmt.Print(" -> ")
+							}
+							fmt.Print(v.Value)
+						}
+						fmt.Println()
+					}
 				} else {
 					// single query
 					answers := kb.Answer(query[0], frame, core.NewQueryContext())

@@ -556,3 +556,50 @@ func AnswerConjunction(answerer Answerer, queries []*Predicate, frame *Frame, ct
 	}()
 	return answers
 }
+
+func (def *PredicateDefinition) Equals(other *PredicateDefinition) bool {
+	if def == other {
+		return true
+	}
+	if def == nil || other == nil {
+		return false // only one is nil, as they aren't equal
+	}
+	if def.Functor != other.Functor || len(def.ArgDefinitions) != len(other.ArgDefinitions) {
+		return false
+	}
+	for i, d := range def.ArgDefinitions {
+		odd := other.ArgDefinitions[i]
+		if !d.Equals(&odd) {
+			return false
+		}
+	}
+	return true
+}
+
+func (def *ArgumentDefinition) Equals(other *ArgumentDefinition) bool {
+	if def.Type != nil && other.Type != nil && def.Type != other.Type {
+		return false
+	}
+	return def.SubDefinition.Equals(other.SubDefinition)
+}
+
+func (def *ArgumentDefinition) String() string {
+	if def.Type != nil {
+		return def.Type.Name
+	}
+	return def.Label + ":" + def.SubDefinition.Functor
+}
+
+func (def *PredicateDefinition) String() string {
+	sb := strings.Builder{}
+	sb.WriteString(def.Functor)
+	sb.WriteString("(")
+	for i, argDef := range def.ArgDefinitions {
+		sb.WriteString(argDef.String())
+		if i < len(def.ArgDefinitions)-1 {
+			sb.WriteString(", ")
+		}
+	}
+	sb.WriteString(")")
+	return sb.String()
+}

@@ -1,6 +1,7 @@
 package knowledgebase
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -56,7 +57,15 @@ func NewKnowledgeBase() *KnowledgeBase {
 }
 
 func (kb *KnowledgeBase) AddPredicateDefinition(pdef *core.PredicateDefinition) {
+	//TODO: check for existing definition. If they differ, report a conflict.
+	if existing, ok := kb.predicateDefinitions[pdef.Functor]; ok {
+		if !existing.Equals(pdef) {
+			fmt.Println("Conflict: ", existing.Functor, " already defined as ", existing.String(), " but now defined as ", pdef.String())
+			return
+		}
+	}
 	kb.predicateDefinitions[pdef.Functor] = pdef
+	// add any new Types, and create special type predicates for them
 	for _, argDef := range pdef.ArgDefinitions {
 		if argDef.Type != nil && kb.predicateDefinitions[argDef.Type.Name] == nil {
 			typePredicate := &core.PredicateDefinition{

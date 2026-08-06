@@ -22,6 +22,24 @@ type searchNode struct {
 	index  int
 }
 
+var ShortestPathPredicate = &core.PredicateDefinition{
+	Functor: "shortestPath",
+	ArgDefinitions: []core.ArgumentDefinition{
+		{
+			Label: "From",
+			Type:  nil,
+		},
+		{
+			Label: "To",
+			Type:  nil,
+		},
+		{
+			Label: "Connector",
+			Type:  nil,
+		},
+	},
+}
+
 func (node *searchNode) traceBack() []*core.Atomic {
 	path := make([]*core.Atomic, 0, 100)
 	for node != nil {
@@ -29,6 +47,10 @@ func (node *searchNode) traceBack() []*core.Atomic {
 		node = node.prev
 	}
 	return path
+}
+
+func NewSearch(answerer core.Answerer) *Search {
+	return &Search{answerer: answerer}
 }
 
 func (search *Search) ShortestPath(start *core.Atomic, end *core.Atomic, connections *core.PredicateDefinition) []*core.Atomic {
@@ -84,13 +106,13 @@ func (search *Search) ShortestPath(start *core.Atomic, end *core.Atomic, connect
 		query.VarRefs[0].Ref = current.atomic
 		adjacent := search.answerer.Answer(query, nil, ctx)
 		for adjacent := range adjacent {
-			adjAtomic := adjacent.VarRefs[1].Ref.(*core.Atomic)
+			adjAtomic := adjacent.GetArgument(1).(*core.Atomic)
 			if adjacent == core.Terminate || visited.Contains(adjAtomic.Index) {
 				continue
 			}
 			var cost uint = 0
 			if len(adjacent.VarRefs) == 3 {
-				cost += adjacent.VarRefs[2].Ref.(*core.Atomic).Index
+				cost += adjacent.GetArgument(2).(*core.Atomic).Index
 			} else {
 				cost += 1
 			}

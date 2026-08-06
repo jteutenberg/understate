@@ -32,3 +32,6 @@ connected(a,d)?
 
 link(d,e)!
 connected(a,e)?
+
+shortestPath(a, e, adjacent(X,Y))?
+shortestPath(a, e, connected(X,Y))?
