@@ -191,10 +191,7 @@ func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, ctx core.Q
 			for {
 				select {
 				case <-searchCtx.Done():
-					searchCtx.depth--
-					searchCtx.PopHistory()
-					close(answers)
-					return
+					goto finished
 				case ans := <-subAnswer:
 					if ans == nil {
 						// end of answers for this answerer
@@ -207,21 +204,16 @@ func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, ctx core.Q
 					sent[argsKey] = true
 					answers <- ans
 					if ans == core.Terminate {
-						searchCtx.depth--
-						searchCtx.PopHistory()
-						close(answers)
-						return
+						goto finished
 					}
 					if p.IsFact() {
 						// only one possible answer: a match
-						searchCtx.depth--
-						searchCtx.PopHistory()
-						close(answers)
-						return
+						goto finished
 					}
 				}
 			}
 		}
+	finished:
 		//fmt.Println("Decreased context depth from", searchCtx.depth, len(searchCtx.history))
 		searchCtx.depth--
 		searchCtx.PopHistory()

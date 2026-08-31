@@ -167,7 +167,6 @@ func (kb *KnowledgeBase) ParsePredicate(functor, arguments string, frame *core.F
 
 func (kb *KnowledgeBase) ParseDefinitionArguments(s string, parent *core.PredicateDefinition) error {
 	for i := 0; i < len(s); i++ {
-		fmt.Println("Parsing definition arguments: ", s)
 		// probe for an atomic argument type: when there is a comma or close parenthesis and no open parenthesis
 		split := i
 		for j := i; j < len(s); j++ {
@@ -188,7 +187,6 @@ func (kb *KnowledgeBase) ParseDefinitionArguments(s string, parent *core.Predica
 					Type:  t,
 				})
 				i = j // this will be incremented by the loop
-				fmt.Println("Parsed definition argument: ", label, " with type ", t.Name)
 				break
 			}
 			if s[j] == '(' {

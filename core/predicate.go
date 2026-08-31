@@ -72,7 +72,7 @@ func (frame *Frame) Clone() *Frame {
 	for label, varRef := range frame.Vars {
 		// dereference everything
 		vr := varRef.Dereference()
-		label = vr.Label
+		//label = vr.Label
 		if _, ok := newSharedVars[label]; ok {
 			continue
 		}
@@ -471,7 +471,7 @@ func AnswerConjunction(answerer Answerer, queries []*Predicate, frame *Frame, ct
 			for j, varRef := range notQuery.VarRefs {
 				vr := varRef.Dereference()
 				if vr.Ref == nil && !seenArgs[vr.Label] {
-					// possibly need to add a dummy type qurey for this. Add just before this query
+					// possibly need to add a dummy type query for this. Add just before this query
 					seenArgs[vr.Label] = true
 					queryType := notQuery.Definition.ArgDefinitions[j].Type
 					def := &PredicateDefinition{Functor: queryType.Name, ArgDefinitions: []ArgumentDefinition{{Type: queryType}}}
@@ -520,6 +520,8 @@ func AnswerConjunction(answerer Answerer, queries []*Predicate, frame *Frame, ct
 			if ans == Terminate || ans == nil {
 				// no more answers
 				stack = stack[:len(stack)-1]
+				partialAnswers = partialAnswers[:len(partialAnswers)-1]
+				frameStack = frameStack[:len(frameStack)-1]
 				if len(stack) == 0 {
 					// we're done
 					close(answers)
@@ -531,10 +533,10 @@ func AnswerConjunction(answerer Answerer, queries []*Predicate, frame *Frame, ct
 			// so now we need to unify this answer with the current query, and continue
 			// NOTE: if the next query is a fact already, we can skip over the cloning bit
 			// as there is no need to unify the arguments
+
 			if !partialAnswers[len(stack)-1][len(stack)-1].CanUnify(ans) {
 				continue
 			}
-			// clone the partial answer and unify with the latest result
 			nextFrame := frameStack[len(stack)-1].Clone()
 			nextPartialAnswer := make([]*Predicate, len(stack)+1)
 			for i, p := range partialAnswers[len(stack)-1] {

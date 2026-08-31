@@ -14,3 +14,11 @@ parent(X, sal)?
 
 parent(X, alex),
 parent(X, jo)?
+
+parent(X, alex),
+parent(X, Y),
+not(eq(Y, alex))?
+
+parent(X,Y),
+parent(X,Z),
+not(eq(Y,Z))?
