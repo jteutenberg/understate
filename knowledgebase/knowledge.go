@@ -214,7 +214,6 @@ func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, ctx core.Q
 			}
 		}
 	finished:
-		//fmt.Println("Decreased context depth from", searchCtx.depth, len(searchCtx.history))
 		searchCtx.depth--
 		searchCtx.PopHistory()
 		close(answers)

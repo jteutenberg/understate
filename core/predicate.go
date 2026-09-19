@@ -72,7 +72,6 @@ func (frame *Frame) Clone() *Frame {
 	for label, varRef := range frame.Vars {
 		// dereference everything
 		vr := varRef.Dereference()
-		//label = vr.Label
 		if _, ok := newSharedVars[label]; ok {
 			continue
 		}
@@ -92,6 +91,9 @@ func (frame *Frame) Clone() *Frame {
 			if vr != varRef {
 				newSharedVars[varRef.Label] = newSharedVars[label]
 			}
+		}
+		if vr.Label != label {
+			newSharedVars[vr.Label] = newSharedVars[label]
 		}
 	}
 	return &Frame{
@@ -411,6 +413,7 @@ func (a *Predicate) CloneInFrame(frame *Frame) *Predicate {
 		} else if vr, ok := frame.Vars[varRef.Label]; ok {
 			p.VarRefs[i] = vr
 		} else {
+			fmt.Println(frame.Vars, "missing", varRef.Label, "at index", i)
 			panic("variable reference not found in frame " + varRef.Label + " " + varRef.String())
 		}
 	}
