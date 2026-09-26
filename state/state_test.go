@@ -104,7 +104,7 @@ func TestStateAnswerQuery(t *testing.T) {
 			{Label: "Y", Ref: nil},
 		},
 	}
-	answer := state.Answer(query, frame, core.NewQueryContext())
+	answer := state.Answer(query, frame, core.NewQueryContext(), core.NewSearchHistory())
 	ansCount := 0
 	for ans := range answer {
 		ansCount++
@@ -132,7 +132,7 @@ func TestStateAnswerQueryPermutations(t *testing.T) {
 			{Label: "Y", Ref: nil},
 		},
 	}
-	answer := state.Answer(query, frame, core.NewQueryContext())
+	answer := state.Answer(query, frame, core.NewQueryContext(), core.NewSearchHistory())
 	ansCount := 0
 	for ans := range answer {
 		ansCount++
@@ -160,7 +160,7 @@ func TestStateAnswerQueryFact(t *testing.T) {
 			{Label: "Y", Ref: atomics["grass"]},
 		},
 	}
-	answer := state.Answer(query, frame, core.NewQueryContext())
+	answer := state.Answer(query, frame, core.NewQueryContext(), core.NewSearchHistory())
 	ansCount := 0
 	for ans := range answer {
 		ansCount++

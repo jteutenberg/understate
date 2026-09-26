@@ -45,7 +45,7 @@ func (calc *Calculator) GetAtomicValue(p *core.Predicate, arg int) *core.Atomic 
 	return nil
 }
 
-func (calc *Calculator) Answer(p *core.Predicate, frame *core.Frame, ctx core.QueryContext) <-chan *core.Predicate {
+func (calc *Calculator) Answer(p *core.Predicate, frame *core.Frame, ctx core.QueryContext, history *core.SearchHistory) <-chan *core.Predicate {
 	answer := make(chan *core.Predicate)
 	go func() {
 		switch p.Definition.Functor {

@@ -86,7 +86,7 @@ func (search *Search) ShortestPath(start *core.Atomic, end *core.Atomic, connect
 	}
 
 	ctx := core.NewQueryContext()
-
+	history := core.NewSearchHistory()
 	open := priorityQueue(make([]*searchNode, 0, 100))
 
 	heap.Push(&open, &searchNode{
@@ -104,7 +104,7 @@ func (search *Search) ShortestPath(start *core.Atomic, end *core.Atomic, connect
 		visited.Add(current.atomic.Index)
 		query := connectTemplate.Clone().(*core.Predicate)
 		query.VarRefs[0].Ref = current.atomic
-		adjacent := search.answerer.Answer(query, nil, ctx)
+		adjacent := search.answerer.Answer(query, nil, ctx, history)
 		for adjacent := range adjacent {
 			adjAtomic := adjacent.GetArgument(1).(*core.Atomic)
 			if adjacent == core.Terminate || visited.Contains(adjAtomic.Index) {

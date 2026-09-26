@@ -52,7 +52,7 @@ func NewAction(signature *core.Predicate, preconditions []*core.Predicate, effec
 func (a *Action) IsApplicable(ans core.Answerer) bool {
 	// test the conjunction of all preconditions
 	if len(a.allPreconditions) > 0 {
-		answers := core.AnswerConjunction(ans, a.allPreconditions, a.frame, core.NewQueryContext())
+		answers := core.AnswerConjunction(ans, a.allPreconditions, a.frame, core.NewQueryContext(), core.NewSearchHistory())
 		answer := <-answers
 		if answer == nil {
 			return false

@@ -59,7 +59,6 @@ func (r *Rule) Clone() *Rule {
 		rhs:   newRHS,
 		frame: frame,
 	}
-
 	return rule
 }
 
@@ -88,7 +87,7 @@ func (rm *RuleMachine) GetName() string {
 	return "RuleMachine"
 }
 
-func (rm *RuleMachine) Answer(p *core.Predicate, frame *core.Frame, ctx core.QueryContext) <-chan *core.Predicate {
+func (rm *RuleMachine) Answer(p *core.Predicate, frame *core.Frame, ctx core.QueryContext, history *core.SearchHistory) <-chan *core.Predicate {
 	answers := make(chan *core.Predicate)
 	go func() {
 	loopRules:
@@ -103,7 +102,7 @@ func (rm *RuleMachine) Answer(p *core.Predicate, frame *core.Frame, ctx core.Que
 					fmt.Printf("error unifying rule %v with %v: %v", rule.lhs, p, err)
 					continue
 				}
-				rm.checkAnswers(unified, answers, ctx)
+				rm.checkAnswers(unified, answers, ctx, history)
 				select {
 				case <-ctx.Done():
 					break loopRules
@@ -121,11 +120,11 @@ func (rm *RuleMachine) String() string {
 	return "A rule machine"
 }
 
-func (rm *RuleMachine) checkAnswers(rule *Rule, answers chan<- *core.Predicate, ctx core.QueryContext) {
+func (rm *RuleMachine) checkAnswers(rule *Rule, answers chan<- *core.Predicate, ctx core.QueryContext, history *core.SearchHistory) {
 	stack := make([]<-chan *core.Predicate, 0, len(rule.rhs))
 	// because we are passing the frame, do we need to clone the rule?
 	// No. It was cloned just before calling
-	stack = append(stack, rm.subAnswerer.Answer(rule.rhs[0], rule.frame, ctx))
+	stack = append(stack, rm.subAnswerer.Answer(rule.rhs[0], rule.frame, ctx, history))
 	ruleStack := make([]*Rule, 0, len(rule.rhs))
 	ruleStack = append(ruleStack, rule)
 	for {
@@ -160,7 +159,7 @@ func (rm *RuleMachine) checkAnswers(rule *Rule, answers chan<- *core.Predicate, 
 			answers <- nextRule.lhs
 		} else {
 			// recurse
-			stack = append(stack, rm.subAnswerer.Answer(nextRule.rhs[len(stack)], nextRule.frame, ctx))
+			stack = append(stack, rm.subAnswerer.Answer(nextRule.rhs[len(stack)], nextRule.frame, ctx, history))
 			ruleStack = append(ruleStack, nextRule)
 		}
 	}

@@ -52,8 +52,14 @@ type qContext struct {
 }
 
 type Answerer interface {
-	Answer(p *Predicate, frame *Frame, ctx QueryContext) <-chan *Predicate
+	Answer(p *Predicate, frame *Frame, ctx QueryContext, history *SearchHistory) <-chan *Predicate
 	GetName() string
+}
+
+type SearchHistory struct {
+	queryString string
+	depth       int
+	prev        *SearchHistory
 }
 
 func NewFrame() *Frame {
@@ -464,7 +470,7 @@ func (a *Predicate) Clone() Unifiable {
 	return p
 }
 
-func AnswerConjunction(answerer Answerer, queries []*Predicate, frame *Frame, ctx QueryContext) <-chan []*Predicate {
+func AnswerConjunction(answerer Answerer, queries []*Predicate, frame *Frame, ctx QueryContext, history *SearchHistory) <-chan []*Predicate {
 	// need to scan for any not() predicates. Then if there are any variables that are not present
 	addTypeQueries := make(map[int]*Predicate)
 	seenArgs := make(map[string]bool)
@@ -511,7 +517,7 @@ func AnswerConjunction(answerer Answerer, queries []*Predicate, frame *Frame, ct
 		fr := frame.Clone()
 		frameStack = append(frameStack, fr)
 		partialAnswers = append(partialAnswers, []*Predicate{queries[0].CloneInFrame(fr)})
-		stack = append(stack, answerer.Answer(partialAnswers[0][0], frameStack[0], ctx))
+		stack = append(stack, answerer.Answer(partialAnswers[0][0], frameStack[0], ctx, history))
 		for {
 			select {
 			case <-ctx.Done():
@@ -555,7 +561,7 @@ func AnswerConjunction(answerer Answerer, queries []*Predicate, frame *Frame, ct
 				nextPartialAnswer[len(stack)] = queries[len(stack)].CloneInFrame(nextFrame)
 				partialAnswers = append(partialAnswers, nextPartialAnswer)
 				frameStack = append(frameStack, nextFrame)
-				stack = append(stack, answerer.Answer(nextPartialAnswer[len(stack)], nextFrame, ctx))
+				stack = append(stack, answerer.Answer(nextPartialAnswer[len(stack)], nextFrame, ctx, history))
 			}
 		}
 	}()
@@ -607,4 +613,57 @@ func (def *PredicateDefinition) String() string {
 	}
 	sb.WriteString(")")
 	return sb.String()
+}
+
+func NewSearchHistory() *SearchHistory {
+	return &SearchHistory{
+		queryString: "",
+		depth:       0,
+		prev:        nil,
+	}
+}
+
+func historyString(p *Predicate) string {
+	sb := strings.Builder{}
+	sb.WriteString(p.Definition.Functor)
+	sb.WriteString("(")
+	sb.WriteString(p.CanonicalArgsString(0))
+	sb.WriteString(")")
+	return sb.String()
+}
+
+func (sh *SearchHistory) AddHistory(p *Predicate) *SearchHistory {
+	s := historyString(p)
+	newHistory := &SearchHistory{
+		queryString: s,
+		depth:       sh.depth + 1,
+		prev:        sh,
+	}
+	return newHistory
+}
+
+func (sh *SearchHistory) Contains(p *Predicate) bool {
+	s := historyString(p)
+	for h := sh; h != nil; h = h.prev {
+		if h.queryString == s {
+			return true
+		}
+	}
+	return false
+}
+
+func (sh *SearchHistory) String() string {
+	sb := strings.Builder{}
+	for h := sh; h != nil; h = h.prev {
+		sb.WriteString(" ")
+		sb.WriteString(strconv.Itoa(h.depth))
+		sb.WriteString(": ")
+		sb.WriteString(h.queryString)
+		sb.WriteString("\n")
+	}
+	return sb.String()
+}
+
+func (sh *SearchHistory) Depth() int {
+	return sh.depth
 }

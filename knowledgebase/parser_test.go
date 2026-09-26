@@ -182,8 +182,12 @@ func TestParseExamples6(t *testing.T) {
 	doParseExamples("../tests/input6.txt", t)
 }
 
+func TestParseExamples7(t *testing.T) {
+	doParseExamples("../tests/input7.txt", t)
+}
 func doParseExamples(filename string, t *testing.T) {
 	kb, _ := relationsKnowledgeBase()
+	kb.MaxDepth = 15
 	// prepare for action
 	actionSet := actions.NewActionSet()
 	// include pathing
@@ -231,7 +235,7 @@ func doParseExamples(filename string, t *testing.T) {
 					}
 				} else {
 					// single query
-					answers := kb.Answer(query[0], frame, core.NewQueryContext())
+					answers := kb.Answer(query[0], frame, core.NewQueryContext(), core.NewSearchHistory())
 					for ans := range answers {
 						fmt.Println("  -> ", ans.String())
 					}
@@ -239,7 +243,7 @@ func doParseExamples(filename string, t *testing.T) {
 				}
 			} else if len(query) > 1 {
 				// conjunction
-				answers := core.AnswerConjunction(kb, query, frame, core.NewQueryContext())
+				answers := core.AnswerConjunction(kb, query, frame, core.NewQueryContext(), core.NewSearchHistory())
 				for ans := range answers {
 					fmt.Println("  ->")
 					for _, p := range ans {

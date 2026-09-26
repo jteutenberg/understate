@@ -1,0 +1,35 @@
+:relation(K:kid, H:hero, A:age).
+
+kid(ethan).
+kid(ali).
+kid(anya).
+hero(spiderman).
+hero(captain_america).
+hero(iron_man).
+age(six).
+age(eight).
+age(ten).
+
+relation(anya,spiderman,A) ~ age(A).
+relation(ethan,H,A) ~ hero(H), age(A), not(eq(H,captain_america)).
+relation(K,spiderman,six) ~ kid(K).
+relation(K,captain_america,eight) ~ kid(K).
+
+:different(X,Y,Z).
+different(X,Y,Z) ~ not(eq(X,Z)), not(eq(X,Y)), not(eq(Y,Z)).
+
+kid(K1),
+kid(K2),
+kid(K3),
+different(K1,K2,K3),
+hero(H1),
+hero(H2),
+hero(H3),
+different(H1,H2,H3),
+age(A1),
+age(A2),
+age(A3),
+different(A1,A2,A3),
+relation(K1,H1,A1),
+relation(K2,H2,A2),
+relation(K3,H3,A3)?

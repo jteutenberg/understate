@@ -39,14 +39,15 @@ type KnowledgeBase struct {
 	core.Answerer
 	predicateDefinitions map[string]*core.PredicateDefinition
 	State                *state.State
-
-	answerers []core.Answerer
+	MaxDepth             int
+	answerers            []core.Answerer
 }
 
 func NewKnowledgeBase() *KnowledgeBase {
 	kb := &KnowledgeBase{
 		predicateDefinitions: make(map[string]*core.PredicateDefinition),
 		State:                state.NewState(),
+		MaxDepth:             100,
 		//TODO: each predicate definition should have its own ordering of answerers
 		answerers: make([]core.Answerer, 0, 10),
 	}
@@ -94,8 +95,8 @@ func (kb *KnowledgeBase) SetTrue(p *core.Predicate) {
 	kb.State.SetTrue(p)
 }
 
-func (kb *KnowledgeBase) Exists(p *core.Predicate, ctx core.QueryContext) bool {
-	answer := kb.Answer(p, core.NewFrame(), ctx)
+func (kb *KnowledgeBase) Exists(p *core.Predicate, ctx core.QueryContext, history *core.SearchHistory) bool {
+	answer := kb.Answer(p, core.NewFrame(), ctx, history)
 	ans := <-answer
 	if ans == nil || ans == core.Terminate {
 		return false
@@ -123,24 +124,17 @@ func (kb *KnowledgeBase) GetName() string {
 	return "KnowledgeBase"
 }
 
-func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, ctx core.QueryContext) <-chan *core.Predicate {
+func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, ctx core.QueryContext, history *core.SearchHistory) <-chan *core.Predicate {
 	answers := make(chan *core.Predicate, 1)
-	// ensure we are using a SearchContext
-	var searchCtx *SearchContext
-	if sCtx, ok := ctx.(*SearchContext); ok {
-		searchCtx = sCtx
-	} else {
-		searchCtx = NewSearchContext(ctx)
-	}
 	//fmt.Println("At depth", searchCtx.depth, "checking history for", p.String())
 	//for b, h := range searchCtx.history {
 	//	fmt.Println(" hist", b, h)
 	//}
-	if searchCtx.InHistory(p) {
+	if history.Contains(p) {
 		close(answers)
 		return answers
 	}
-	if searchCtx.depth > 100 {
+	if history.Depth() > kb.MaxDepth {
 		close(answers)
 		return answers
 	}
@@ -148,7 +142,7 @@ func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, ctx core.Q
 	go func() {
 		if p.Definition == Not {
 			subP := (p.VarRefs[0].Dereference().Ref).(*core.Predicate)
-			if kb.Exists(subP, searchCtx) {
+			if kb.Exists(subP, ctx, history) {
 				answers <- core.Terminate
 				close(answers)
 				return
@@ -176,8 +170,7 @@ func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, ctx core.Q
 			}
 		}
 		sent := map[string]bool{}
-		searchCtx.AddHistory(p)
-		searchCtx.depth++
+		history = history.AddHistory(p)
 		mask := make([]bool, len(p.VarRefs))
 		for i := range mask {
 			// ignore variables labelled with leading underscore
@@ -186,11 +179,11 @@ func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, ctx core.Q
 		//fmt.Println("Increased context depth to", searchCtx.depth, len(searchCtx.history))
 	loopAnswerers:
 		for _, answerer := range kb.answerers {
-			subAnswer := answerer.Answer(p, frame, searchCtx)
+			subAnswer := answerer.Answer(p, frame, ctx, history)
 
 			for {
 				select {
-				case <-searchCtx.Done():
+				case <-ctx.Done():
 					goto finished
 				case ans := <-subAnswer:
 					if ans == nil {
@@ -214,8 +207,6 @@ func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, ctx core.Q
 			}
 		}
 	finished:
-		searchCtx.depth--
-		searchCtx.PopHistory()
 		close(answers)
 	}()
 	return answers
