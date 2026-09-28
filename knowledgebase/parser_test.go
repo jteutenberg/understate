@@ -181,10 +181,10 @@ func TestParseExamples5(t *testing.T) {
 func TestParseExamples6(t *testing.T) {
 	doParseExamples("../tests/input6.txt", t)
 }
-
 func TestParseExamples7(t *testing.T) {
 	doParseExamples("../tests/input7.txt", t)
 }
+
 func doParseExamples(filename string, t *testing.T) {
 	kb, _ := relationsKnowledgeBase()
 	kb.MaxDepth = 15

@@ -1,4 +1,5 @@
-:relation(K:kid, H:hero, A:age).
+:wears(K:kid, H:hero).
+:isage(K:kid, A:age).
 
 kid(ethan).
 kid(ali).
@@ -10,10 +11,10 @@ age(six).
 age(eight).
 age(ten).
 
-relation(anya,spiderman,A) ~ age(A).
-relation(ethan,H,A) ~ hero(H), age(A), not(eq(H,captain_america)).
-relation(K,spiderman,six) ~ kid(K).
-relation(K,captain_america,eight) ~ kid(K).
+wears(anya,spiderman).
+not(wears(anya, captain_america)).
+not(wears(anya, iron_man)).
+not(wears(ethan,captain_america)).
 
 :different(X,Y,Z).
 different(X,Y,Z) ~ not(eq(X,Z)), not(eq(X,Y)), not(eq(Y,Z)).
@@ -26,10 +27,17 @@ hero(H1),
 hero(H2),
 hero(H3),
 different(H1,H2,H3),
+wears(K1,H1),
+wears(K2,H2),
+wears(K3,H3),
 age(A1),
 age(A2),
 age(A3),
 different(A1,A2,A3),
-relation(K1,H1,A1),
-relation(K2,H2,A2),
-relation(K3,H3,A3)?
+isage(K1,A1),
+isage(K2,A2),
+isage(K3,A3),
+wears(X,spiderman),
+isage(X,six),
+wears(Y,captain_america),
+isage(Y,eight)?

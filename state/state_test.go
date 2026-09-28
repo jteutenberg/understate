@@ -50,7 +50,7 @@ func setupTest() (map[string]*core.Type, map[string]*core.PredicateDefinition, m
 	return types, predDefs, atomics
 }
 
-func basicState(defs map[string]*core.PredicateDefinition, atomics map[string]*core.Atomic) *State {
+func basicState(defs map[string]*core.PredicateDefinition, atomics map[string]*core.Atomic) State {
 	trueFact := &core.Predicate{
 		Definition: defs["eat"],
 		VarRefs: []*core.VariableReference{
@@ -80,7 +80,7 @@ func basicState(defs map[string]*core.PredicateDefinition, atomics map[string]*c
 			{Label: "Y", Ref: atomics["beef"]},
 		},
 	}
-	return &State{
+	return &simpleState{
 		TrueFacts: map[string][]*core.Predicate{
 			"eat": {trueFact, trueFact2, trueFact3},
 		},

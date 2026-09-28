@@ -38,7 +38,7 @@ var Eq = &core.PredicateDefinition{
 type KnowledgeBase struct {
 	core.Answerer
 	predicateDefinitions map[string]*core.PredicateDefinition
-	State                *state.State
+	State                state.State
 	MaxDepth             int
 	answerers            []core.Answerer
 }
@@ -48,7 +48,7 @@ func NewKnowledgeBase() *KnowledgeBase {
 		predicateDefinitions: make(map[string]*core.PredicateDefinition),
 		State:                state.NewState(),
 		MaxDepth:             100,
-		//TODO: each predicate definition should have its own ordering of answerers
+		//TODO: each predicate definition could have its own ordering of answerers
 		answerers: make([]core.Answerer, 0, 10),
 	}
 	kb.answerers = append(kb.answerers, kb.State)
@@ -57,8 +57,18 @@ func NewKnowledgeBase() *KnowledgeBase {
 	return kb
 }
 
+// Duplicate is a shallow copy of the KnowledgeBase.
+func (kb *KnowledgeBase) Duplicate() *KnowledgeBase {
+	newKb := NewKnowledgeBase()
+	newKb.predicateDefinitions = kb.predicateDefinitions
+	newKb.State = kb.State
+	newKb.MaxDepth = kb.MaxDepth
+	newKb.answerers = kb.answerers
+	return newKb
+}
+
 func (kb *KnowledgeBase) AddPredicateDefinition(pdef *core.PredicateDefinition) {
-	//TODO: check for existing definition. If they differ, report a conflict.
+	//check for existing definition. If they differ, report a conflict. Should this be an error?
 	if existing, ok := kb.predicateDefinitions[pdef.Functor]; ok {
 		if !existing.Equals(pdef) {
 			fmt.Println("Conflict: ", existing.Functor, " already defined as ", existing.String(), " but now defined as ", pdef.String())
@@ -126,10 +136,6 @@ func (kb *KnowledgeBase) GetName() string {
 
 func (kb *KnowledgeBase) Answer(p *core.Predicate, frame *core.Frame, ctx core.QueryContext, history *core.SearchHistory) <-chan *core.Predicate {
 	answers := make(chan *core.Predicate, 1)
-	//fmt.Println("At depth", searchCtx.depth, "checking history for", p.String())
-	//for b, h := range searchCtx.history {
-	//	fmt.Println(" hist", b, h)
-	//}
 	if history.Contains(p) {
 		close(answers)
 		return answers

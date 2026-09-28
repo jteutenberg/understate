@@ -13,8 +13,17 @@ var Numeric = &core.Type{
 	Atomics: bitset.NewIntSet(),
 }
 
-type State struct {
+type State interface {
 	core.Answerer
+	GetType(name string) *core.Type
+	GetNumericAtomic(index uint) *core.Atomic
+	GetAtomic(name string, t *core.Type) *core.Atomic
+	SetTrue(p *core.Predicate)
+	SetFalse(p *core.Predicate)
+}
+
+type simpleState struct {
+	State
 	// facts by Functor name
 	TrueFacts  map[string][]*core.Predicate
 	FalseFacts map[string][]*core.Predicate
@@ -27,8 +36,8 @@ type State struct {
 	numericAtomics []*core.Atomic
 }
 
-func NewState() *State {
-	return &State{
+func NewState() State {
+	return &simpleState{
 		TrueFacts:      make(map[string][]*core.Predicate),
 		FalseFacts:     make(map[string][]*core.Predicate),
 		AllAtomics:     bitset.NewIntSet(),
@@ -39,7 +48,7 @@ func NewState() *State {
 	}
 }
 
-func (s *State) Answer(p *core.Predicate, frame *core.Frame, ctx core.QueryContext, history *core.SearchHistory) <-chan *core.Predicate {
+func (s *simpleState) Answer(p *core.Predicate, frame *core.Frame, ctx core.QueryContext, history *core.SearchHistory) <-chan *core.Predicate {
 	trueFacts := s.TrueFacts[p.Definition.Functor]
 	falseFacts := s.FalseFacts[p.Definition.Functor]
 	answers := make(chan *core.Predicate)
@@ -106,11 +115,11 @@ func (s *State) Answer(p *core.Predicate, frame *core.Frame, ctx core.QueryConte
 	return answers
 }
 
-func (s *State) GetName() string {
+func (s *simpleState) GetName() string {
 	return "State"
 }
 
-func (s *State) GetType(name string) *core.Type {
+func (s *simpleState) GetType(name string) *core.Type {
 	if t := s.Types[name]; t != nil {
 		return t
 	}
@@ -125,7 +134,7 @@ func (s *State) GetType(name string) *core.Type {
 	return t
 }
 
-func (s *State) GetNumericAtomic(index uint) *core.Atomic {
+func (s *simpleState) GetNumericAtomic(index uint) *core.Atomic {
 	if s.numericAtomics[index] == nil || index >= uint(len(s.numericAtomics)) {
 		a := &core.Atomic{
 			Index: index,
@@ -142,7 +151,7 @@ func (s *State) GetNumericAtomic(index uint) *core.Atomic {
 	return s.numericAtomics[index]
 }
 
-func (s *State) GetAtomic(name string, t *core.Type) *core.Atomic {
+func (s *simpleState) GetAtomic(name string, t *core.Type) *core.Atomic {
 	if a := s.atomicsByName[name]; a != nil {
 		return a
 	}
@@ -185,7 +194,7 @@ func (s *State) GetAtomic(name string, t *core.Type) *core.Atomic {
 	return atomic
 }
 
-func (s *State) SetTrue(p *core.Predicate) {
+func (s *simpleState) SetTrue(p *core.Predicate) {
 	if !p.IsFact() {
 		panic("predicate is not a fact: " + p.String())
 	}
@@ -197,7 +206,7 @@ func (s *State) SetTrue(p *core.Predicate) {
 	//TODO: remove from false facts, if it exists
 }
 
-func (s *State) SetFalse(p *core.Predicate) {
+func (s *simpleState) SetFalse(p *core.Predicate) {
 	if !p.IsFact() {
 		panic("predicate is not a fact: " + p.String())
 	}

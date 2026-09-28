@@ -12,7 +12,7 @@ type RuleMachine struct {
 	core.Answerer
 	rules       []*Rule
 	subAnswerer core.Answerer
-	state       *state.State // for caching intermediate results
+	state       state.State // for caching intermediate results
 }
 
 type Rule struct {
@@ -27,7 +27,7 @@ var Cut = &core.Predicate{
 	},
 }
 
-func NewRuleMachine(subAnswerer core.Answerer, state *state.State) *RuleMachine {
+func NewRuleMachine(subAnswerer core.Answerer, state state.State) *RuleMachine {
 	return &RuleMachine{
 		subAnswerer: subAnswerer,
 		state:       state,

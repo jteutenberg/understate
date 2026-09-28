@@ -67,7 +67,7 @@ func (a *Action) GetApplicableActions(ans core.Answerer) []*Action {
 }
 
 // ApplyTo updates any ground effects of this action to the given state
-func (a *Action) ApplyTo(s *state.State) {
+func (a *Action) ApplyTo(s state.State) {
 	for _, addEffect := range a.AddEffects {
 		if addEffect.IsFact() {
 			s.SetTrue(addEffect)

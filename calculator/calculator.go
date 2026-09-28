@@ -7,7 +7,7 @@ import (
 
 type Calculator struct {
 	core.Answerer
-	state *state.State
+	state state.State
 }
 
 var Gt = &core.PredicateDefinition{
@@ -27,7 +27,7 @@ var Sum = &core.PredicateDefinition{
 	},
 }
 
-func NewCalculator(state *state.State) *Calculator {
+func NewCalculator(state state.State) *Calculator {
 	return &Calculator{
 		state: state,
 	}
