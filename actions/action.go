@@ -62,8 +62,24 @@ func (a *Action) IsApplicable(ans core.Answerer) bool {
 }
 
 // Return ground versions of this action that are applicable to the given answerer
-func (a *Action) GetApplicableActions(ans core.Answerer) []*Action {
-	return nil
+func (a *Action) GetApplicableActions(ans core.Answerer) <-chan *Action {
+	output := make(chan *Action)
+	go func() {
+		defer close(output)
+		answers := core.AnswerConjunction(ans, a.allPreconditions, a.frame, core.NewQueryContext(), core.NewSearchHistory())
+		for answer := range answers {
+			if answer == nil {
+				continue
+			}
+			groundAction := a.Clone()
+			// unify all preconditions
+			for i, precond := range groundAction.allPreconditions {
+				precond.Unify(answer[i])
+			}
+			output <- groundAction
+		}
+	}()
+	return output
 }
 
 // ApplyTo updates any ground effects of this action to the given state

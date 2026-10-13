@@ -33,5 +33,15 @@ func (as *ActionSet) GetAction(signature *core.Predicate) *Action {
 // ApplicableActions uses a state to generate possible atomics for negative preconditions, and an
 // answerer to find all valid unifications with each action's signature.
 func (as *ActionSet) ApplicableActions(state *state.State, answerer core.Answerer) <-chan *Action {
-	return nil
+	output := make(chan *Action)
+	go func() {
+		defer close(output)
+		for _, action := range as.actions {
+			groundActions := action.GetApplicableActions(answerer)
+			for _, groundAction := range groundActions {
+				output <- groundAction
+			}
+		}
+	}()
+	return output
 }
