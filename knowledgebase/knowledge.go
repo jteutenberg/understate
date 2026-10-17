@@ -67,6 +67,16 @@ func (kb *KnowledgeBase) Duplicate() *KnowledgeBase {
 	return newKb
 }
 
+// EmptyDuplicate creates a new KnowledgeBase with the same predicate definitions
+// as the original, but with a fresh state and no answerers.
+func (kb *KnowledgeBase) EmptyDuplicate() *KnowledgeBase {
+	newKb := NewKnowledgeBase()
+	for _, def := range kb.predicateDefinitions {
+		newKb.AddPredicateDefinition(def)
+	}
+	return newKb
+}
+
 func (kb *KnowledgeBase) AddPredicateDefinition(pdef *core.PredicateDefinition) {
 	//check for existing definition. If they differ, report a conflict. Should this be an error?
 	if existing, ok := kb.predicateDefinitions[pdef.Functor]; ok {

@@ -196,7 +196,7 @@ func (s *simpleState) GetAtomic(name string, t *core.Type) *core.Atomic {
 
 func (s *simpleState) SetTrue(p *core.Predicate) {
 	if !p.IsFact() {
-		panic("predicate is not a fact: " + p.String())
+		panic("predicate is not a fact: " + p.String() + " " + p.StringVerbose())
 	}
 	if s.TrueFacts[p.Definition.Functor] == nil {
 		s.TrueFacts[p.Definition.Functor] = make([]*core.Predicate, 0)

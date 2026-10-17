@@ -1,3 +1,7 @@
+:parent(Parent:Person,Child:Person).
+:sibling(A:Person,B:Person).
+:grandparent(A:Person,B:Person).
+
 parent(sam, alex).
 parent(jo,alex).
 parent(sam, sal).

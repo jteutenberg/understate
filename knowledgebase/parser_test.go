@@ -6,7 +6,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/jteutenberg/bitset-go"
 	"github.com/jteutenberg/understate/actions"
 	"github.com/jteutenberg/understate/calculator"
 	"github.com/jteutenberg/understate/core"
@@ -14,7 +13,6 @@ import (
 	"github.com/jteutenberg/understate/knowledgebase"
 	"github.com/jteutenberg/understate/pathing"
 	"github.com/jteutenberg/understate/rules"
-	"github.com/jteutenberg/understate/state"
 )
 
 func TestParseArguments(t *testing.T) {
@@ -106,62 +104,15 @@ func TestParseClausePredicate(t *testing.T) {
 	}
 }
 
-func relationsKnowledgeBase() (*knowledgebase.KnowledgeBase, *rules.RuleMachine) {
+func testKnowledgeBase() (*knowledgebase.KnowledgeBase, *rules.RuleMachine) {
 	kb := knowledgebase.NewKnowledgeBase()
 	rules := rules.NewRuleMachine(kb, kb.State)
 	kb.AddAnswerer(rules)
 	kb.AddAnswerer(calculator.NewCalculator(kb.State))
 	kb.AddPredicateDefinition(calculator.Gt)
 	kb.AddPredicateDefinition(calculator.Sum)
-	person := &core.Type{
-		Name:    "Person",
-		Atomics: bitset.NewIntSet(),
-	}
-	kb.AddPredicateDefinition(&core.PredicateDefinition{
-		Functor: "parent",
-		ArgDefinitions: []core.ArgumentDefinition{
-			{Label: "Parent", Type: person},
-			{Label: "Child", Type: person},
-		},
-	})
-	kb.AddPredicateDefinition(&core.PredicateDefinition{
-		Functor: "sibling",
-		ArgDefinitions: []core.ArgumentDefinition{
-			{Label: "A", Type: person},
-			{Label: "B", Type: person},
-		},
-	})
-	kb.AddPredicateDefinition(&core.PredicateDefinition{
-		Functor: "grandparent",
-		ArgDefinitions: []core.ArgumentDefinition{
-			{Label: "Grandparent", Type: person},
-			{Label: "Grandchild", Type: person},
-		},
-	})
 	return kb, rules
 }
-
-func linesKnowledgeBase() (*knowledgebase.KnowledgeBase, *rules.RuleMachine) {
-	kb := knowledgebase.NewKnowledgeBase()
-	rules := rules.NewRuleMachine(kb, kb.State)
-	kb.AddAnswerer(rules)
-	kb.AddPredicateDefinition(&core.PredicateDefinition{
-		Functor: "point",
-		ArgDefinitions: []core.ArgumentDefinition{
-			{Label: "X", Type: state.Numeric},
-			{Label: "Y", Type: state.Numeric},
-		},
-	})
-	kb.AddPredicateDefinition(&core.PredicateDefinition{
-		Functor: "line",
-		ArgDefinitions: []core.ArgumentDefinition{
-			{Label: "A", Type: nil},
-			{Label: "B", Type: nil},
-		},
-	})
-	return kb, rules
-}
-
 func TestParseExamples1(t *testing.T) {
 	doParseExamples("../tests/input1.txt", t)
 }
@@ -184,9 +135,12 @@ func TestParseExamples6(t *testing.T) {
 func TestParseExamples7(t *testing.T) {
 	doParseExamples("../tests/input7.txt", t)
 }
+func TestParseExamplesTree(t *testing.T) {
+	doParseExamples("../examples/family_tree.txt", t)
+}
 
 func doParseExamples(filename string, t *testing.T) {
-	kb, _ := relationsKnowledgeBase()
+	kb, _ := testKnowledgeBase()
 	kb.MaxDepth = 15
 	// prepare for action
 	actionSet := actions.NewActionSet()

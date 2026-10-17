@@ -282,7 +282,7 @@ func (kb *KnowledgeBase) ParseClause(s string, typeHint *core.Type, frame *core.
 			if s[0] >= 'a' && s[0] <= 'z' {
 				// atomic
 				return kb.State.GetAtomic(s[:i], typeHint), j, nil
-			} else if s[0] >= '1' && s[0] <= '9' {
+			} else if s[0] >= '0' && s[0] <= '9' {
 				// numeric
 				return kb.State.GetAtomic(s[:i], state.Numeric), j, nil
 			} else {
