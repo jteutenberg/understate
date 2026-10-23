@@ -60,7 +60,6 @@ func (s *simpleState) Answer(p *core.Predicate, frame *core.Frame, ctx core.Quer
 			for _, fact := range falseFacts {
 				if fact.CanUnify(p) {
 					answers <- core.Terminate
-					close(answers)
 					goto done
 				}
 			}
